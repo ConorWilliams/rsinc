@@ -7,15 +7,15 @@ import sys
 import re
 import os.path
 import io
-import platform
-import shutil
+# import platform
+# import shutil
 import subprocess
 
 from datetime import datetime
 import time
-import inspect
+# import inspect
 import collections
-import hashlib
+# import hashlib
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
@@ -25,6 +25,11 @@ from config import *
 LINE_FORMAT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
 
 
+def log(*args):
+    if verbosity:
+        print(*args)
+
+
 def load_list(infile):
     # Format ex:
     #  3009805 2013-09-16 04:13:50.000000000 12 - Wait.mp3
@@ -32,6 +37,7 @@ def load_list(infile):
     #    size  <----- datetime (epoch) ----> key
 
     d = {}
+    log('reading:', infile)
     try:
         with io.open(infile, mode='rt', encoding='utf8') as f:
             for line in f:
@@ -55,11 +61,6 @@ def load_list(infile):
         exit(1)
 
 
-def log(*args):
-    if verbosity:
-        print(*args)
-
-
 # ***** rclone call wrapper functions with retries *****
 maxTries = 3
 
@@ -70,26 +71,76 @@ def rclone_lsl(path, ofile):
             process_args = ["rclone", "lsl", path]
             if not subprocess.call(process_args, stdout=of):
                 return 0
-    return 1
+    print("LSL-FAILED:", path)
+    exit(1)
 
 
 def check_exist(path):
-    log('checking', path)
-
     if os.path.exists(path):
+        log('checked', path)
         return 0
     else:
         print('cant find', path)
         exit(1)
 
 
-file_r = {"old": "_remote.txt", "tmp": "_remote.tmp"}
-file_l = {"old": "_local.txt", "tmp": "_local.tmp"}
+def deltas(old, tmp):
+    out = {}
 
-dict_r = {"old": {}, "tmp": {}}
-dict_l = {"old": {}, "tmp": {}}
+    s_old = set(old)
+    s_tmp = set(tmp)
+
+    deleted = s_old.difference(tmp)
+    created = s_tmp.difference(s_old)
+    inter = s_tmp.intersection(s_old)
+
+    for key in created:
+        out.update({key: 3})
+
+    for key in deleted:
+        out.update({key: 2})
+
+    for key in inter:
+        if old[key]['size'] != tmp[key]['size'] or tmp[key]['datetime'] > old[key]['datetime']:
+            out.update({key: 1})
+        else:
+            out.update({key: 0})
+
+    return out
+
+
+def cpyR(source, dest):
+    log("copy:", source, "to", dest)
+    return
+
+
+def cpyL(dest, source):
+    log("copy:", source, "to", dest)
+    return
+
+
+def null(*args):
+    return
+
+
+def conflict(source, dest):
+    log('conflict', source)
+    return
+
+
+def delL(left, right):
+    log('delete', left)
+    return
+
+
+def delR(left, right):
+    log('delete', right)
+    return
+
 
 folders = []
+main = {}
+
 verbosity = False
 
 # ***** arguments read *****
@@ -101,8 +152,7 @@ parser.add_argument("folders", help="folders to sync", nargs='*')
 parser.add_argument("-f", "--first", help="first run flag",
                     action="store_true")
 
-group = parser.add_mutually_exclusive_group()
-group.add_argument("-v", "--verbose", action="store_true", help="lots of info")
+parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 
 args = parser.parse_args()
 
@@ -110,40 +160,112 @@ if args.folders == []:
     folders = default_folders
 else:
     for folder in args.folders:
-        folders.append(folder + "/")
-
-if args.verbose:
-    verbosity = True
+        folders.append(folder)
 
 
-# ***** check exists *****
+verbosity = args.verbose
+
+# ***** Build main data structure *****
 for f in folders:
-    check_exist(base_l + f[:-1])
+    main.update({f + '/': {'lcl': {"file": {"old": f + "_lcl.txt", "tmp": f + "_lcl.tmp"},
+                                   "dict": {"old": {}, "tmp": {}}},
+                           'rmt': {"file": {"old": f + "_rmt.txt", "tmp": f + "_rmt.tmp"},
+                                   "dict": {"old": {}, "tmp": {}}}}})
+
+# ***** check exists local directories *****
+for f in main:
+    check_exist(base_l + f)
 
 # ***** first run *****
 if args.first:
     print("first run making index files")
-    for f in folders:
-        if verbosity == 2:
-            print('making:', f[:-1] + file_r['old'],
-                  f, f[:-1] + file_l['old'])
+    for f in main:
+        log("writing:", main[f]['lcl']['file']
+            ['old'], main[f]['rmt']['file']['old'])
 
-        rclone_lsl(base_l + f, f[:-1] + file_r['old'])
-        rclone_lsl(base_r + f, f[:-1] + file_l['old'])
+        rclone_lsl(base_r + f, main[f]['rmt']['file']['old'])
+        rclone_lsl(base_l + f, main[f]['lcl']['file']['old'])
 else:
-    for f in folders:
-        check_exist(f[:-1] + file_r['old'])
-        check_exist(f[:-1] + file_l['old'])
+    for f in main:
+        check_exist(main[f]['lcl']['file']['old'])
+        check_exist(main[f]['rmt']['file']['old'])
 
-
+# ***** make and read files *****
 print("making tmp files")
-for f in folders:
-    rclone_lsl(base_l + f, f[:-1] + file_r['tmp'])
-    rclone_lsl(base_r + f, f[:-1] + file_l['tmp'])
+for f in main:
+    rclone_lsl(base_r + f + '/', main[f]['rmt']['file']['tmp'])
+    rclone_lsl(base_l + f + '/', main[f]['lcl']['file']['tmp'])
 
 print("reading files")
-for f in folders:
-    dict_l[old] = load_list()
+for f in main:
+    main[f]['lcl']['dict']['old'] = load_list(main[f]['lcl']['file']['old'])
+    main[f]['lcl']['dict']['tmp'] = load_list(main[f]['lcl']['file']['tmp'])
+    main[f]['rmt']['dict']['old'] = load_list(main[f]['rmt']['file']['old'])
+    main[f]['rmt']['dict']['tmp'] = load_list(main[f]['rmt']['file']['tmp'])
 
+
+# ***** confirm old dicts match *****
+# print('checking old dicts match')
+# lcl = set(main[f]['lcl']['dict']['old'])
+# rmt = set(main[f]['rmt']['dict']['old'])
+
+# if len(lcl.symmetric_difference(rmt)) > 0:
+#     print("ERROR old dicts corrupt, size wrong")
+#     exit(0)
+
+# lcl = main[f]['lcl']['dict']['old']
+# rmt = main[f]['rmt']['dict']['old']
+
+# for key in lcl:
+#     if rmt[key]['size'] != lcl[key]['size'] or rmt[key]['datetime'] != lcl[key]['datetime']:
+#         print("ERROR old dicts corrupt at:", key)
+#         exit(0)
+
+# ***** build diff dicts *****
+print('building diffs')
+lcl_del = {}
+rmt_del = {}
+
+for f in main:
+    lcl_del.update({f: {}})
+    rmt_del.update({f: {}})
+
+for f in main:
+    lcl_del.update(
+        {f: deltas(main[f]['lcl']['dict']['old'],
+                   main[f]['lcl']['dict']['tmp'])})
+
+    rmt_del.update(
+        {f: deltas(main[f]['rmt']['dict']['old'],
+                   main[f]['rmt']['dict']['tmp'])})
+
+LOGIC = [[null, cpyL, delL, conflict],
+         [cpyR, conflict, cpyR, conflict],
+         [delR, cpyL, null, cpyL],
+         [conflict, conflict, cpyR, conflict]]
+
+# ***** main logic *****
+print('main logic')
+for f in main:
+    lcl = lcl_del[f]
+    rmt = rmt_del[f]
+
+    s_lcl = set(lcl)
+    s_rmt = set(rmt)
+
+    rmt_dif = s_rmt.difference(s_lcl)  # in rmt only
+    lcl_dif = s_lcl.difference(s_rmt)  # in lcl only
+    inter = s_rmt.intersection(s_lcl)  # in both
+
+    for key in inter:
+        LOGIC[lcl[key]][rmt[key]](base_l + key, base_r + key)
+
+
+# # ***** clean up temps *****
+# for f in main:
+#     subprocess.run(["mv", main[f]['lcl']['file']['tmp'],
+#                     main[f]['lcl']['file']['old']])
+#     subprocess.run(["mv", main[f]['rmt']['file']['tmp'],
+#                     main[f]['rmt']['file']['old']])
 
 print("END")
