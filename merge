@@ -1,0 +1,149 @@
+#!/usr/bin/python3
+
+drive_dir = '/home/conor/drive'
+
+import argparse
+import sys
+import re
+import os.path
+import io
+import platform
+import shutil
+import subprocess
+
+from datetime import datetime
+import time
+import inspect
+import collections
+import hashlib
+
+sys.path.insert(0, drive_dir)
+os.chdir(drive_dir)
+from config import *
+
+
+LINE_FORMAT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
+
+
+def load_list(infile):
+    # Format ex:
+    #  3009805 2013-09-16 04:13:50.000000000 12 - Wait.mp3
+    #   541087 2017-06-19 21:23:28.610000000 DSC02478.JPG
+    #    size  <----- datetime (epoch) ----> key
+
+    d = {}
+    try:
+        with io.open(infile, mode='rt', encoding='utf8') as f:
+            for line in f:
+                out = LINE_FORMAT.match(line)
+                if out:
+                    size = out.group(1)
+                    date = out.group(2)
+                    _time = out.group(3)
+                    microsec = out.group(4)
+                    date_time = time.mktime(datetime.strptime(
+                        date + ' ' + _time, '%Y-%m-%d %H:%M:%S').timetuple()) + float('.' + microsec)
+                    filename = out.group(5)  # .decode("utf-8")  # cjn
+                    d[filename] = {u'size': size, u'datetime': date_time}
+                else:
+                    print(u"line (ignored) in {}:\n  <{}>".format(infile, line))
+        # return Success and a sorted list
+        return collections.OrderedDict(sorted(d.items()))
+
+    except Exception as e:
+        print(u"Exception in load_list loading <{}>:  <{}>".format(infile, e))
+        exit(1)
+
+
+def log(*args):
+    if verbosity:
+        print(*args)
+
+
+# ***** rclone call wrapper functions with retries *****
+maxTries = 3
+
+
+def rclone_lsl(path, ofile):
+    for x in range(maxTries):
+        with open(ofile, "w") as of:
+            process_args = ["rclone", "lsl", path]
+            if not subprocess.call(process_args, stdout=of):
+                return 0
+    return 1
+
+
+def check_exist(path):
+    log('checking', path)
+
+    if os.path.exists(path):
+        return 0
+    else:
+        print('cant find', path)
+        exit(1)
+
+
+file_r = {"old": "_remote.txt", "tmp": "_remote.tmp"}
+file_l = {"old": "_local.txt", "tmp": "_local.tmp"}
+
+dict_r = {"old": {}, "tmp": {}}
+dict_l = {"old": {}, "tmp": {}}
+
+folders = []
+verbosity = False
+
+# ***** arguments read *****
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("folders", help="folders to sync", nargs='*')
+
+parser.add_argument("-f", "--first", help="first run flag",
+                    action="store_true")
+
+group = parser.add_mutually_exclusive_group()
+group.add_argument("-v", "--verbose", action="store_true", help="lots of info")
+
+args = parser.parse_args()
+
+if args.folders == []:
+    folders = default_folders
+else:
+    for folder in args.folders:
+        folders.append(folder + "/")
+
+if args.verbose:
+    verbosity = True
+
+
+# ***** check exists *****
+for f in folders:
+    check_exist(base_l + f[:-1])
+
+# ***** first run *****
+if args.first:
+    print("first run making index files")
+    for f in folders:
+        if verbosity == 2:
+            print('making:', f[:-1] + file_r['old'],
+                  f, f[:-1] + file_l['old'])
+
+        rclone_lsl(base_l + f, f[:-1] + file_r['old'])
+        rclone_lsl(base_r + f, f[:-1] + file_l['old'])
+else:
+    for f in folders:
+        check_exist(f[:-1] + file_r['old'])
+        check_exist(f[:-1] + file_l['old'])
+
+
+print("making tmp files")
+for f in folders:
+    rclone_lsl(base_l + f, f[:-1] + file_r['tmp'])
+    rclone_lsl(base_r + f, f[:-1] + file_l['tmp'])
+
+print("reading files")
+for f in folders:
+    dict_l[old] = load_list()
+
+
+print("END")
