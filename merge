@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-drive_dir = '/home/conor/drive'
+drive_dir = '/home/conor/drive/'
 
 import argparse
 import sys
@@ -75,71 +75,118 @@ def rclone_lsl(path, ofile):
     exit(1)
 
 
+class data():
+    def __init__(self, base, arg, last):
+        swap = str.maketrans("/", '_')
+
+        self.path = base + arg + '/'
+        self.p_old = arg.translate(swap) + last + '.txt'  # remove / from arg
+        self.p_tmp = arg.translate(swap) + last + '.tmp'  # remove /
+
+        self.d_old = {}
+        self.d_tmp = {}
+        self.d_dif = {}
+
+        self.s_old = set({})
+        self.s_tmp = set({})
+        self.s_dif = set({})
+
+    def build_dif(self):
+        self.s_old = set(self.d_old)
+        self.s_tmp = set(self.d_tmp)
+
+        deleted = self.s_old.difference(self.s_tmp)
+        created = self.s_tmp.difference(self.s_old)
+
+        inter = self.s_tmp.intersection(self.s_old)
+
+        for key in created:
+            self.d_dif.update({key: 3})
+
+        for key in deleted:
+            self.d_dif.update({key: 2})
+
+        for key in inter:
+            if self.d_old[key]['size'] != self.d_tmp[key]['size']:
+                self.d_dif.update({key: 1})
+            elif self.d_tmp[key]['datetime'] > self.d_old[key]['datetime']:
+                self.d_dif.update({key: 1})
+            else:
+                self.d_dif.update({key: 0})
+
+        self.s_dif = set(self.d_dif)
+
+
+class direct():
+    def __init__(self, arg):
+        self.lcl = data(base_l, arg, '_lcl')
+        self.rmt = data(base_r, arg, '_rmt')
+        self.path = arg
+
+    def build_dif(self):
+        self.lcl.build_dif()
+        self.rmt.build_dif()
+
+
 def check_exist(path):
     if os.path.exists(path):
         log('checked', path)
         return 0
     else:
-        print('cant find', path)
-        exit(1)
-
-
-def deltas(old, tmp):
-    out = {}
-
-    s_old = set(old)
-    s_tmp = set(tmp)
-
-    deleted = s_old.difference(tmp)
-    created = s_tmp.difference(s_old)
-    inter = s_tmp.intersection(s_old)
-
-    for key in created:
-        out.update({key: 3})
-
-    for key in deleted:
-        out.update({key: 2})
-
-    for key in inter:
-        if old[key]['size'] != tmp[key]['size'] or tmp[key]['datetime'] > old[key]['datetime']:
-            out.update({key: 1})
-        else:
-            out.update({key: 0})
-
-    return out
+        return 1
 
 
 def cpyR(source, dest):
-    log("copy:", source, "to", dest)
+    print("copy:", source, "to", dest)
+    if not dry_run:
+        subprocess.run(['rclone', 'copyto', source, dest])
     return
 
 
 def cpyL(dest, source):
-    log("copy:", source, "to", dest)
+    print("copy:", source, "to", dest)
+    if not dry_run:
+        subprocess.run(['rclone', 'copyto', source, dest])
     return
 
 
 def null(*args):
+    log('Null with', args[0])
     return
 
 
 def conflict(source, dest):
-    log('conflict', source)
+    print('conflict', source, dest)
+    if not dry_run:
+        subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
+        subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
+
+        cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
+        cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
     return
 
 
 def delL(left, right):
-    log('delete', left)
+    print('delete', left)
+    if not dry_run:
+        subprocess.run(['rclone', 'delete', left])
     return
 
 
 def delR(left, right):
-    log('delete', right)
+    print('delete', right)
+    if not dry_run:
+        subprocess.run(['rclone', 'delete', right])
     return
 
 
+LOGIC = [[null, cpyL, delL, conflict],
+         [cpyR, conflict, cpyR, conflict],
+         [delR, cpyL, null, cpyL],
+         [conflict, conflict, cpyR, conflict]]
+
 folders = []
-main = {}
+main = []
 
 verbosity = False
 
@@ -154,6 +201,8 @@ parser.add_argument("-f", "--first", help="first run flag",
 
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 
+parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
+
 args = parser.parse_args()
 
 if args.folders == []:
@@ -162,110 +211,121 @@ else:
     for folder in args.folders:
         folders.append(folder)
 
-
+dry_run = args.dry
 verbosity = args.verbose
 
 # ***** Build main data structure *****
 for f in folders:
-    main.update({f + '/': {'lcl': {"file": {"old": f + "_lcl.txt", "tmp": f + "_lcl.tmp"},
-                                   "dict": {"old": {}, "tmp": {}}},
-                           'rmt': {"file": {"old": f + "_rmt.txt", "tmp": f + "_rmt.tmp"},
-                                   "dict": {"old": {}, "tmp": {}}}}})
+    main.append(direct(f))
 
 # ***** check exists local directories *****
-for f in main:
-    check_exist(base_l + f)
-
-# ***** first run *****
-if args.first:
-    print("first run making index files")
-    for f in main:
-        log("writing:", main[f]['lcl']['file']
-            ['old'], main[f]['rmt']['file']['old'])
-
-        rclone_lsl(base_r + f, main[f]['rmt']['file']['old'])
-        rclone_lsl(base_l + f, main[f]['lcl']['file']['old'])
-else:
-    for f in main:
-        check_exist(main[f]['lcl']['file']['old'])
-        check_exist(main[f]['rmt']['file']['old'])
-
-# ***** make and read files *****
-print("making tmp files")
-for f in main:
-    rclone_lsl(base_r + f + '/', main[f]['rmt']['file']['tmp'])
-    rclone_lsl(base_l + f + '/', main[f]['lcl']['file']['tmp'])
-
-print("reading files")
-for f in main:
-    main[f]['lcl']['dict']['old'] = load_list(main[f]['lcl']['file']['old'])
-    main[f]['lcl']['dict']['tmp'] = load_list(main[f]['lcl']['file']['tmp'])
-    main[f]['rmt']['dict']['old'] = load_list(main[f]['rmt']['file']['old'])
-    main[f]['rmt']['dict']['tmp'] = load_list(main[f]['rmt']['file']['tmp'])
-
-
-# ***** confirm old dicts match *****
-# print('checking old dicts match')
-# lcl = set(main[f]['lcl']['dict']['old'])
-# rmt = set(main[f]['rmt']['dict']['old'])
-
-# if len(lcl.symmetric_difference(rmt)) > 0:
-#     print("ERROR old dicts corrupt, size wrong")
-#     exit(0)
-
-# lcl = main[f]['lcl']['dict']['old']
-# rmt = main[f]['rmt']['dict']['old']
-
-# for key in lcl:
-#     if rmt[key]['size'] != lcl[key]['size'] or rmt[key]['datetime'] != lcl[key]['datetime']:
-#         print("ERROR old dicts corrupt at:", key)
-#         exit(0)
-
-# ***** build diff dicts *****
-print('building diffs')
-lcl_del = {}
-rmt_del = {}
+if not args.first:
+    main[:] = [tup for tup in main if not check_exist(tup.lcl.path)]
 
 for f in main:
-    lcl_del.update({f: {}})
-    rmt_del.update({f: {}})
+    print('Attempting:', f.path, '\n')
+    recover = False
 
-for f in main:
-    lcl_del.update(
-        {f: deltas(main[f]['lcl']['dict']['old'],
-                   main[f]['lcl']['dict']['tmp'])})
+    if check_exist(f.lcl.p_tmp) == 0 or check_exist(f.rmt.p_tmp) == 0:
+        print('ERROR, detected crash, missing .tmp')
+        recover = True
 
-    rmt_del.update(
-        {f: deltas(main[f]['rmt']['dict']['old'],
-                   main[f]['rmt']['dict']['tmp'])})
+    # ***** first run *****
+    if args.first:
+        print("First run making index files")
+        log("Writing:", f.rmt.p_old, f.lcl.p_old)
 
-LOGIC = [[null, cpyL, delL, conflict],
-         [cpyR, conflict, cpyR, conflict],
-         [delR, cpyL, null, cpyL],
-         [conflict, conflict, cpyR, conflict]]
+        rclone_lsl(f.rmt.path, f.rmt.p_old)
+        rclone_lsl(f.lcl.path, f.lcl.p_old)
+        recover = bool(input('Enter recover mode? y/n:'))
+    else:
+        if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
+            print("Enter, cant find old file, run with -f")
+            continue
 
-# ***** main logic *****
-print('main logic')
-for f in main:
-    lcl = lcl_del[f]
-    rmt = rmt_del[f]
+    # ***** make and read files *****
+    print("Making tmp files")
 
-    s_lcl = set(lcl)
-    s_rmt = set(rmt)
+    rclone_lsl(f.rmt.path, f.rmt.p_tmp)
+    rclone_lsl(f.lcl.path, f.lcl.p_tmp)
 
-    rmt_dif = s_rmt.difference(s_lcl)  # in rmt only
-    lcl_dif = s_lcl.difference(s_rmt)  # in lcl only
-    inter = s_rmt.intersection(s_lcl)  # in both
+    print("Reading files")
 
-    for key in inter:
-        LOGIC[lcl[key]][rmt[key]](base_l + key, base_r + key)
+    f.lcl.d_old = load_list(f.lcl.p_old)
+    f.rmt.d_old = load_list(f.rmt.p_old)
 
+    f.lcl.d_tmp = load_list(f.lcl.p_tmp)
+    f.rmt.d_tmp = load_list(f.rmt.p_tmp)
 
-# # ***** clean up temps *****
-# for f in main:
-#     subprocess.run(["mv", main[f]['lcl']['file']['tmp'],
-#                     main[f]['lcl']['file']['old']])
-#     subprocess.run(["mv", main[f]['rmt']['file']['tmp'],
-#                     main[f]['rmt']['file']['old']])
+    # ***** confirm old dicts match ** ***
+    if not args.first:
+        lcl = set(f.lcl.d_old)
+        rmt = set(f.rmt.d_old)
 
-print("END")
+        if len(lcl.symmetric_difference(rmt)) > 0:
+            print("ERROR old dicts corrupt, size wrong")
+            continue
+
+        for key in f.lcl.d_old:
+            if f.lcl.d_old[key]['size'] != f.rmt.d_old[key]['size']:
+                print("ERROR old dicts corrupt at:", key)
+                continue
+
+    # ***** build diff dicts *****
+    print('Building change dicts  \n')
+
+    f.build_dif()
+
+    # ***** main logic *****
+    print('Main logic begins')
+    if recover:
+        print("Running recovery")
+        rmt_dif = f.rmt.s_tmp.difference(f.lcl.s_tmp)  # in rmt only
+        lcl_dif = f.lcl.s_tmp.difference(f.rmt.s_tmp)  # in lcl only
+
+        inter = f.rmt.s_tmp.intersection(f.lcl.s_tmp)  # in both
+
+        for key in rmt_dif:
+            cpyL(f.lcl.path + key, f.rmt.path + key)
+
+        for key in lcl_dif:
+            cpyR(f.lcl.path + key, f.rmt.path + key)
+
+        for key in inter:
+            if f.lcl.d_tmp[key]['size'] != f.rmt.d_tmp[key]['size']:
+                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
+                else:
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
+
+    else:
+        rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
+        lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
+
+        inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
+
+        for key in inter:
+            LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                f.lcl.path + key, f.rmt.path + key)
+
+        for key in lcl_dif:
+            if f.lcl.d_dif[key] != 2:
+                cpyR(f.lcl.path + key, f.rmt.path + key)
+
+        for key in rmt_dif:
+            if f.rmt.d_dif[key] != 2:
+                cpyL(f.lcl.path + key, f.rmt.path + key)
+
+    # ***** clean up temps *****
+
+    if not dry_run:
+        rclone_lsl(f.rmt.path, f.rmt.p_tmp)
+        rclone_lsl(f.lcl.path, f.lcl.p_tmp)
+
+        subprocess.run(["mv", f.lcl.p_tmp, f.lcl.p_old])
+        subprocess.run(["mv", f.rmt.p_tmp, f.rmt.p_old])
+    else:
+        subprocess.run(["rm", f.lcl.p_tmp])
+        subprocess.run(["rm", f.rmt.p_tmp])
+
+print("Sync Done")
