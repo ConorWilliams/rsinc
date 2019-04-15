@@ -7,15 +7,11 @@ import sys
 import re
 import os.path
 import io
-# import platform
-# import shutil
 import subprocess
 
 from datetime import datetime
 import time
-# import inspect
 import collections
-# import hashlib
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
@@ -31,11 +27,6 @@ def log(*args):
 
 
 def load_list(infile):
-    # Format ex:
-    #  3009805 2013-09-16 04:13:50.000000000 12 - Wait.mp3
-    #   541087 2017-06-19 21:23:28.610000000 DSC02478.JPG
-    #    size  <----- datetime (epoch) ----> key
-
     d = {}
     log('reading:', infile)
     try:
@@ -203,6 +194,9 @@ parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 
+parser.add_argument("-r", "--recovery", action="store_true",
+                    help="enter recovery mode")
+
 args = parser.parse_args()
 
 if args.folders == []:
@@ -224,7 +218,7 @@ if not args.first:
 
 for f in main:
     print('Attempting:', f.path, '\n')
-    recover = False
+    recover = args.recovery
 
     if check_exist(f.lcl.p_tmp) == 0 or check_exist(f.rmt.p_tmp) == 0:
         print('ERROR, detected crash, missing .tmp')
