@@ -46,8 +46,7 @@ subprocess.run('clear')
 print('''/*
  * Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
  * This is free software with ABSOLUTELY NO WARRANTY
- */ 
- ''')
+ */''')
 
 
 LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
@@ -156,13 +155,14 @@ def lsl(path):
     d = {}
 
     for line in iter(result.stdout.readline, ''):
-        out = LINE_FMT.match(line)
+        g = LINE_FMT.match(line)
 
-        size = int(out.group(1))
-        age = out.group(2) + ' ' + out.group(3)
+        size = int(g.group(1))
+        age = g.group(2) + ' ' + g.group(3)
         date_time = int(time.mktime(
             datetime.strptime(age, TIME_FMT).timetuple()))
-        filename = out.group(5)
+
+        filename = g.group(5)
 
         d[filename] = {u'bytesize': size, u'datetime': date_time}
 
@@ -256,6 +256,8 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
 parser.add_argument("-f", "--first", help="first run flag", action="store_true")
+parser.add_argument(
+    "-a", "--auto", help="don't ask permission", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 parser.add_argument("-r", "--recovery", action="store_true",
@@ -272,6 +274,7 @@ else:
 dry_run = args.dry
 verbosity = args.verbose
 recover = args.recovery
+auto = args.auto
 
 # Build main data structure
 for f in folders:
@@ -283,32 +286,11 @@ if not args.first:
 
 
 for f in main:
-    puts(grn('Merging: ') + f.path)
+    print('\n')
 
     if check_exist(f.lcl.p_tmp) == 0 or check_exist(f.rmt.p_tmp) == 0:
-        print('ERROR, detected crash, found .tmp.json')
+        puts(red('ERROR') + ', detected crash, found ' + f.path + '.tmp')
         recover = True
-
-    # First run
-    if args.first:
-        print("First run, making index files")
-
-        f.lcl.d_old = lsl(f.lcl.path)
-        f.rmt.d_old = lsl(f.rmt.path)
-        if not dry_run:
-            write(f.lcl.p_old, f.lcl.d_old)
-            write(f.rmt.p_old, f.lcl.d_old)
-
-        recover = strtobool[input('Enter recover mode? y/n: ')]
-    else:
-        print('Reading last state')
-
-        if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
-            puts(red("ERROR") + " can't find old file, run with -f")
-            continue
-
-        f.lcl.d_old = read(f.lcl.p_old)
-        f.rmt.d_old = read(f.rmt.p_old)
 
     # make and read files
     puts(grn("Indexing: ") + f.path + '/')
@@ -320,19 +302,40 @@ for f in main:
         write(f.lcl.p_tmp, f.lcl.d_tmp)
         write(f.rmt.p_tmp, f.lcl.d_tmp)
 
-    # Confirm old dicts match
-    if not args.first:
-        lcl = set(f.lcl.d_old)
-        rmt = set(f.rmt.d_old)
+    # First run
+    if args.first:
+        print("First run, making index files")
 
-        if len(lcl.symmetric_difference(rmt)) > 0:
-            puts(red("ERROR") + " old dicts corrupt, size wrong")
+        f.lcl.d_old = lsl(f.lcl.path)
+        f.rmt.d_old = lsl(f.rmt.path)
+        if not dry_run:
+            write(f.lcl.p_old, f.lcl.d_old)
+            write(f.rmt.p_old, f.lcl.d_old)
+
+        recover = True
+    else:
+        print('Reading last state')
+
+        if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
+            puts(red("ERROR") + " can't find old file, run with -f")
             continue
 
-        for item in f.lcl.d_old.values():
-            if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
-                puts(red("ERROR") + " old dicts corrupt at:" + key)
+        f.lcl.d_old = read(f.lcl.p_old)
+        f.rmt.d_old = read(f.rmt.p_old)
+
+        # Confirm old dicts match
+        if not recover:
+            lcl = set(f.lcl.d_old)
+            rmt = set(f.rmt.d_old)
+
+            if len(lcl.symmetric_difference(rmt)) > 0:
+                puts(red("ERROR") + " old dicts corrupt, size wrong")
                 continue
+
+            for item in f.lcl.d_old.values():
+                if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
+                    puts(red("ERROR") + " old dicts corrupt at:" + key)
+                    continue
 
     print('Finding Changes')
 
@@ -350,7 +353,9 @@ for f in main:
             puts(grn('Dry pass:'))
             dry_run = True
         else:
-            dry_run = False
+            if not mem_dry:
+                dry_run = False
+
             total_jobs = counter
 
             if counter == 0:
@@ -358,8 +363,9 @@ for f in main:
                 continue
             elif mem_dry:
                 continue
-            elif not strtobool[input('Execute? ')]:
+            elif not auto and not strtobool[input('Execute? ')]:
                 continue
+
             puts(grn("Live pass:"))
 
         counter = 0

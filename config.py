@@ -7,4 +7,4 @@ Config file file for rclone_two_way_sync
 base_r = 'onedrive:'
 base_l = '/home/conor/'
 
-default_folders = ['cpp']
+default_folders = ['cpp', 'test']
