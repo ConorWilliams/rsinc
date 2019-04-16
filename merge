@@ -299,20 +299,22 @@ for f in main:
             write(f.lcl.p_old, f.lcl.d_old)
             write(f.rmt.p_old, f.lcl.d_old)
 
-        recover = strtobool(input('Enter recover mode? y/n:'))
+        recover = strtobool[input('Enter recover mode? y/n: ')]
     else:
+        print('Reading last state')
+
         if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
             puts(red("ERROR") + " can't find old file, run with -f")
             continue
 
+        f.lcl.d_old = read(f.lcl.p_old)
+        f.rmt.d_old = read(f.rmt.p_old)
+
     # make and read files
-    print("Reading Files")
+    puts(grn("Indexing: ") + f.path + '/')
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
-
-    f.lcl.d_old = read(f.lcl.p_old)
-    f.rmt.d_old = read(f.rmt.p_old)
 
     if not dry_run:
         write(f.lcl.p_tmp, f.lcl.d_tmp)
@@ -341,18 +343,20 @@ for f in main:
     lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
     inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
-    for state in [True, False]:
-        if dry_run and state:
-            continue
-        else:
-            dry_run = state
-            total_jobs = counter
+    mem_dry = dry_run
 
+    for state in [True, False]:
         if state:
             puts(grn('Dry pass:'))
+            dry_run = True
         else:
+            dry_run = False
+            total_jobs = counter
+
             if counter == 0:
                 print('Nothing to Sync')
+                continue
+            elif mem_dry:
                 continue
             elif not strtobool[input('Execute? ')]:
                 continue
@@ -361,31 +365,33 @@ for f in main:
         counter = 0
 
         if recover:
-            print("Running recovery")
-            for key in rmt_dif:
+            print("Running Recovery")
+            for key in sorted(rmt_dif):
                 cpyL(f.lcl.path + key, f.rmt.path + key)
 
-            for key in lcl_dif:
+            for key in sorted(lcl_dif):
                 cpyR(f.lcl.path + key, f.rmt.path + key)
 
-            for key in inter:
+            for key in sorted(inter):
                 if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
                     if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
                         cpyR(f.lcl.path + key, f.rmt.path + key)
                     else:
                         cpyL(f.lcl.path + key, f.rmt.path + key)
         else:
-            for key in inter:
-                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                    f.lcl.path + key, f.rmt.path + key)
-
-            for key in lcl_dif:
+            for key in sorted(lcl_dif):
                 if f.lcl.d_dif[key] != 2:
                     cpyR(f.lcl.path + key, f.rmt.path + key)
 
-            for key in rmt_dif:
+            for key in sorted(rmt_dif):
                 if f.rmt.d_dif[key] != 2:
                     cpyL(f.lcl.path + key, f.rmt.path + key)
+
+            for key in sorted(inter):
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
+
+    dry_run = mem_dry
 
     # clean up temps
     if not dry_run:
