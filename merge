@@ -24,36 +24,52 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
-print('This is free software with ABSOLUTELY NO WARRANTY.')
-
 drive_dir = '/home/conor/drive/'  # where config and data files will be stored
 
 import argparse
 import json
-import sys
-import re
 import os.path
-import io
-
-from subprocess import PIPE, run, Popen
-from datetime import datetime
+import re
+import subprocess
+import sys
 import time
 
+from clint.textui import colored, puts
+from datetime import datetime
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
 from config import *
 
+subprocess.run('clear')
+
+print('''/*
+ * Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
+ * This is free software with ABSOLUTELY NO WARRANTY
+ */ 
+ ''')
+
 
 LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
 TIME_FMT = '%Y-%m-%d %H:%M:%S'
 
+strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
+             1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
+             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False}
+
+counter = 0
+total_jobs = 0
+
+ylw = colored.yellow
+cyn = colored.cyan
+red = colored.red
+grn = colored.green
+
+swap = str.maketrans("/", '_')
+
 
 class data():
     def __init__(self, base, arg, last):
-        swap = str.maketrans("/", '_')
-
         self.path = base + arg + '/'
         self.p_old = arg.translate(swap) + last + '.json'  # remove / from arg
         self.p_tmp = arg.translate(swap) + last + '.tmp.json'  # ^
@@ -112,7 +128,7 @@ def read(file):
     '''
     Reads json do dict and returns dict
     '''
-    log('reading', file)
+    log('Reading', file)
     with open(file, 'r') as fp:
         d = json.load(fp)
 
@@ -123,18 +139,19 @@ def write(file, d):
     '''
     Writes dict to json
     '''
-    log('writing', file)
+    log('Writing', file)
     with open(file, 'w') as fp:
         json.dump(d, fp, sort_keys=True, indent=4)
 
 
 def lsl(path):
     '''
-    Runs rclone lsl on path and returns a dict containing each file with the 
+    Runs rclone lsl on path and returns a dict containing each file with the
     size and last modified time as integers
     '''
     command = ['rclone', 'lsl', path]
-    result = Popen(command, stdout=PIPE, universal_newlines=True)
+    result = subprocess.Popen(
+        command, stdout=subprocess.PIPE, universal_newlines=True)
 
     d = {}
 
@@ -154,23 +171,33 @@ def lsl(path):
 
 def check_exist(path):
     if os.path.exists(path):
-        log('checked', path)
+        log('Checked', path)
         return 0
     else:
         return 1
 
 
 def cpyR(source, dest):
-    print("push:", source)
+    global counter
+    counter += 1
+
     if not dry_run:
+        puts('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
         subprocess.run(['rclone', 'copyto', source, dest])
+    else:
+        puts(cyn("Push: ") + source)
     return
 
 
 def cpyL(dest, source):
-    print("pull:", source)
+    global counter
+    counter += 1
+
     if not dry_run:
+        puts('%d/%d' % (counter, total_jobs) + cyn(' Pull: ') + source)
         subprocess.run(['rclone', 'copyto', source, dest])
+    else:
+        puts(cyn("Pull: ") + source)
     return
 
 
@@ -179,7 +206,7 @@ def null(*args):
 
 
 def conflict(source, dest):
-    print('conflict', source, dest)
+    puts(red('Conflict: ') + source)
     if not dry_run:
         subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
         subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
@@ -190,16 +217,26 @@ def conflict(source, dest):
 
 
 def delL(left, right):
-    print('delete', left)
+    global counter
+    counter += 1
+
     if not dry_run:
+        puts('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
         subprocess.run(['rclone', 'delete', left])
+    else:
+        puts(cyn("Delete: ") + left)
     return
 
 
 def delR(left, right):
-    print('delete', right)
+    global counter
+    counter += 1
+
     if not dry_run:
+        puts('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
         subprocess.run(['rclone', 'delete', right])
+    else:
+        puts(cyn("Delete: ") + right)
     return
 
 
@@ -213,19 +250,14 @@ main = []
 
 verbosity = False
 
-# ***** arguments read *****
+# read terminal arguments
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
-
-parser.add_argument("-f", "--first", help="first run flag",
-                    action="store_true")
-
+parser.add_argument("-f", "--first", help="first run flag", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
-
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
-
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
 
@@ -239,29 +271,27 @@ else:
 
 dry_run = args.dry
 verbosity = args.verbose
+recover = args.recovery
 
-# ***** Build main data structure *****
+# Build main data structure
 for f in folders:
     main.append(direct(f))
 
-print(folders)
-
-# ***** check exists local directories *****
+# Check exists local directories, remove if not
 if not args.first:
     main[:] = [tup for tup in main if not check_exist(tup.lcl.path)]
 
 
 for f in main:
-    print('Attempting:', f.path, '\n')
-    recover = args.recovery
+    puts(grn('Merging: ') + f.path)
 
     if check_exist(f.lcl.p_tmp) == 0 or check_exist(f.rmt.p_tmp) == 0:
-        print('ERROR, detected crash, missing .tmp')
+        print('ERROR, detected crash, found .tmp.json')
         recover = True
 
-    # ***** first run *****
+    # First run
     if args.first:
-        print("First run making index files")
+        print("First run, making index files")
 
         f.lcl.d_old = lsl(f.lcl.path)
         f.rmt.d_old = lsl(f.rmt.path)
@@ -269,89 +299,101 @@ for f in main:
             write(f.lcl.p_old, f.lcl.d_old)
             write(f.rmt.p_old, f.lcl.d_old)
 
-        recover = bool(input('Enter recover mode? y/n:'))
+        recover = strtobool(input('Enter recover mode? y/n:'))
     else:
         if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
-            print("Enter, cant find old file, run with -f")
+            puts(red("ERROR") + " can't find old file, run with -f")
             continue
 
-    # ***** make and read files *****
-    print("Reading directories")
+    # make and read files
+    print("Reading Files")
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
+
+    f.lcl.d_old = read(f.lcl.p_old)
+    f.rmt.d_old = read(f.rmt.p_old)
 
     if not dry_run:
         write(f.lcl.p_tmp, f.lcl.d_tmp)
         write(f.rmt.p_tmp, f.lcl.d_tmp)
 
-    # ***** confirm old dicts match ** ***
+    # Confirm old dicts match
     if not args.first:
         lcl = set(f.lcl.d_old)
         rmt = set(f.rmt.d_old)
 
         if len(lcl.symmetric_difference(rmt)) > 0:
-            print("ERROR old dicts corrupt, size wrong")
+            puts(red("ERROR") + " old dicts corrupt, size wrong")
             continue
 
-        for key in f.lcl.d_old:
-            if f.lcl.d_old[key]['bytesize'] != f.rmt.d_old[key]['bytesize']:
-                print("ERROR old dicts corrupt at:", key)
+        for item in f.lcl.d_old.values():
+            if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
+                puts(red("ERROR") + " old dicts corrupt at:" + key)
                 continue
 
-    # ***** build diff dicts *****
-    print('Building change dicts  \n')
+    print('Finding Changes')
 
     f.build_dif()
 
-    # ***** main logic *****
-    print('Main logic begins')
-    if recover:
-        print("Running recovery")
-        rmt_dif = f.rmt.s_tmp.difference(f.lcl.s_tmp)  # in rmt only
-        lcl_dif = f.lcl.s_tmp.difference(f.rmt.s_tmp)  # in lcl only
+    # main logic
+    rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
+    lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
+    inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
-        inter = f.rmt.s_tmp.intersection(f.lcl.s_tmp)  # in both
+    for state in [True, False]:
+        if dry_run and state:
+            continue
+        else:
+            dry_run = state
+            total_jobs = counter
 
-        for key in rmt_dif:
-            cpyL(f.lcl.path + key, f.rmt.path + key)
+        if state:
+            puts(grn('Dry pass:'))
+        else:
+            if counter == 0:
+                print('Nothing to Sync')
+                continue
+            elif not strtobool[input('Execute? ')]:
+                continue
+            puts(grn("Live pass:"))
 
-        for key in lcl_dif:
-            cpyR(f.lcl.path + key, f.rmt.path + key)
+        counter = 0
 
-        for key in inter:
-            if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
-                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
-                    cpyR(f.lcl.path + key, f.rmt.path + key)
-                else:
-                    cpyL(f.lcl.path + key, f.rmt.path + key)
-
-    else:
-        rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
-        lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
-
-        inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
-
-        for key in inter:
-            LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                f.lcl.path + key, f.rmt.path + key)
-
-        for key in lcl_dif:
-            if f.lcl.d_dif[key] != 2:
-                cpyR(f.lcl.path + key, f.rmt.path + key)
-
-        for key in rmt_dif:
-            if f.rmt.d_dif[key] != 2:
+        if recover:
+            print("Running recovery")
+            for key in rmt_dif:
                 cpyL(f.lcl.path + key, f.rmt.path + key)
 
-    # ***** clean up temps *****
+            for key in lcl_dif:
+                cpyR(f.lcl.path + key, f.rmt.path + key)
 
+            for key in inter:
+                if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
+                    if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
+                        cpyR(f.lcl.path + key, f.rmt.path + key)
+                    else:
+                        cpyL(f.lcl.path + key, f.rmt.path + key)
+        else:
+            for key in inter:
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
+
+            for key in lcl_dif:
+                if f.lcl.d_dif[key] != 2:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
+
+            for key in rmt_dif:
+                if f.rmt.d_dif[key] != 2:
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
+
+    # clean up temps
     if not dry_run:
-        rclone_lsl(f.rmt.path, f.rmt.p_tmp)
-        rclone_lsl(f.lcl.path, f.lcl.p_tmp)
+        write(f.rmt.p_old, lsl(f.rmt.path))
+        write(f.lcl.p_old, lsl(f.lcl.path))
 
-        subprocess.run(["mv", f.lcl.p_tmp, f.lcl.p_old])
-        subprocess.run(["mv", f.rmt.p_tmp, f.rmt.p_old])
+        subprocess.run(["rm", f.lcl.p_tmp])
+        subprocess.run(["rm", f.rmt.p_tmp])
 
-
-print("Sync Done")
+print('')
+puts(grn("All Done!"))
