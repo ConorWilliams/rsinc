@@ -27,18 +27,19 @@ SOFTWARE.
 print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
 print('This is free software with ABSOLUTELY NO WARRANTY.')
 
-drive_dir = '/home/conor/drive/' #where config and data files will be stored
+drive_dir = '/home/conor/drive/'  # where config and data files will be stored
 
 import argparse
+import json
 import sys
 import re
 import os.path
 import io
-import subprocess
 
+from subprocess import PIPE, run, Popen
 from datetime import datetime
 import time
-import collections
+
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
@@ -46,51 +47,7 @@ from config import *
 
 
 LINE_FORMAT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
-
-
-def log(*args):
-    if verbosity:
-        print(*args)
-
-
-def load_list(infile):
-    d = {}
-    log('reading:', infile)
-    try:
-        with io.open(infile, mode='rt', encoding='utf8') as f:
-            for line in f:
-                out = LINE_FORMAT.match(line)
-                if out:
-                    size = out.group(1)
-                    date = out.group(2)
-                    _time = out.group(3)
-                    microsec = out.group(4)
-                    date_time = time.mktime(datetime.strptime(
-                        date + ' ' + _time, '%Y-%m-%d %H:%M:%S').timetuple()) + float('.' + microsec)
-                    filename = out.group(5)  # .decode("utf-8")  # cjn
-                    d[filename] = {u'size': size, u'datetime': date_time}
-                else:
-                    print(u"line (ignored) in {}:\n  <{}>".format(infile, line))
-        # return Success and a sorted list
-        return collections.OrderedDict(sorted(d.items()))
-
-    except Exception as e:
-        print(u"Exception in load_list loading <{}>:  <{}>".format(infile, e))
-        exit(1)
-
-
-# ***** rclone call wrapper functions with retries *****
-maxTries = 3
-
-
-def rclone_lsl(path, ofile):
-    for x in range(maxTries):
-        with open(ofile, "w") as of:
-            process_args = ["rclone", "lsl", path]
-            if not subprocess.call(process_args, stdout=of):
-                return 0
-    print("LSL-FAILED:", path)
-    exit(1)
+TIME_FMT = '%Y-%m-%d %H:%M:%S'
 
 
 class data():
@@ -98,8 +55,8 @@ class data():
         swap = str.maketrans("/", '_')
 
         self.path = base + arg + '/'
-        self.p_old = arg.translate(swap) + last + '.txt'  # remove / from arg
-        self.p_tmp = arg.translate(swap) + last + '.tmp'  # remove /
+        self.p_old = arg.translate(swap) + last + '.json'  # remove / from arg
+        self.p_tmp = arg.translate(swap) + last + '.tmp.json'  # ^
 
         self.d_old = {}
         self.d_tmp = {}
@@ -125,7 +82,7 @@ class data():
             self.d_dif.update({key: 2})
 
         for key in inter:
-            if self.d_old[key]['size'] != self.d_tmp[key]['size']:
+            if self.d_old[key]['bytesize'] != self.d_tmp[key]['bytesize']:
                 self.d_dif.update({key: 1})
             elif self.d_tmp[key]['datetime'] > self.d_old[key]['datetime']:
                 self.d_dif.update({key: 1})
@@ -146,6 +103,55 @@ class direct():
         self.rmt.build_dif()
 
 
+def log(*args):
+    if verbosity:
+        print(*args)
+
+
+def read(file):
+    '''
+    Reads json do dict and returns dict
+    '''
+    log('reading', file)
+    with open(file, 'r') as fp:
+        d = json.load(fp)
+
+    return d
+
+
+def write(file, d):
+    '''
+    Writes dict to json
+    '''
+    log('writing', file)
+    with open(file, 'w') as fp:
+        json.dump(d, fp, sort_keys=True, indent=4)
+
+
+def lsl(path):
+    '''
+    Runs rclone lsl on path and returns a dict containing each file with the 
+    size and last modified time as integers
+    '''
+    command = ['rclone', 'lsl', path]
+    result = Popen(command, stdout=PIPE, universal_newlines=True)
+
+    d = {}
+
+    for line in iter(result.stdout.readline, ''):
+        out = LINE_FMT.match(line)
+
+        size = int(out.group(1))
+        age = out.group(2) + ' ' + out.group(3)
+        date_time = int(time.mktime(
+            datetime.strptime(age, TIME_FMT).timetuple()))
+        filename = out.group(5)
+
+        d[filename] = {u'bytesize': size, u'datetime': date_time}
+
+    return d
+
+
 def check_exist(path):
     if os.path.exists(path):
         log('checked', path)
@@ -155,21 +161,20 @@ def check_exist(path):
 
 
 def cpyR(source, dest):
-    print("copy:", source, "to", dest)
+    print("push:", source)
     if not dry_run:
         subprocess.run(['rclone', 'copyto', source, dest])
     return
 
 
 def cpyL(dest, source):
-    print("copy:", source, "to", dest)
+    print("pull:", source)
     if not dry_run:
         subprocess.run(['rclone', 'copyto', source, dest])
     return
 
 
 def null(*args):
-    log('Null with', args[0])
     return
 
 
@@ -239,9 +244,12 @@ verbosity = args.verbose
 for f in folders:
     main.append(direct(f))
 
+print(folders)
+
 # ***** check exists local directories *****
 if not args.first:
     main[:] = [tup for tup in main if not check_exist(tup.lcl.path)]
+
 
 for f in main:
     print('Attempting:', f.path, '\n')
@@ -254,10 +262,13 @@ for f in main:
     # ***** first run *****
     if args.first:
         print("First run making index files")
-        log("Writing:", f.rmt.p_old, f.lcl.p_old)
 
-        rclone_lsl(f.rmt.path, f.rmt.p_old)
-        rclone_lsl(f.lcl.path, f.lcl.p_old)
+        f.lcl.d_old = lsl(f.lcl.path)
+        f.rmt.d_old = lsl(f.rmt.path)
+        if not dry_run:
+            write(f.lcl.p_old, f.lcl.d_old)
+            write(f.rmt.p_old, f.lcl.d_old)
+
         recover = bool(input('Enter recover mode? y/n:'))
     else:
         if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
@@ -265,18 +276,14 @@ for f in main:
             continue
 
     # ***** make and read files *****
-    print("Making tmp files")
+    print("Reading directories")
 
-    rclone_lsl(f.rmt.path, f.rmt.p_tmp)
-    rclone_lsl(f.lcl.path, f.lcl.p_tmp)
+    f.lcl.d_tmp = lsl(f.lcl.path)
+    f.rmt.d_tmp = lsl(f.rmt.path)
 
-    print("Reading files")
-
-    f.lcl.d_old = load_list(f.lcl.p_old)
-    f.rmt.d_old = load_list(f.rmt.p_old)
-
-    f.lcl.d_tmp = load_list(f.lcl.p_tmp)
-    f.rmt.d_tmp = load_list(f.rmt.p_tmp)
+    if not dry_run:
+        write(f.lcl.p_tmp, f.lcl.d_tmp)
+        write(f.rmt.p_tmp, f.lcl.d_tmp)
 
     # ***** confirm old dicts match ** ***
     if not args.first:
@@ -288,7 +295,7 @@ for f in main:
             continue
 
         for key in f.lcl.d_old:
-            if f.lcl.d_old[key]['size'] != f.rmt.d_old[key]['size']:
+            if f.lcl.d_old[key]['bytesize'] != f.rmt.d_old[key]['bytesize']:
                 print("ERROR old dicts corrupt at:", key)
                 continue
 
@@ -313,7 +320,7 @@ for f in main:
             cpyR(f.lcl.path + key, f.rmt.path + key)
 
         for key in inter:
-            if f.lcl.d_tmp[key]['size'] != f.rmt.d_tmp[key]['size']:
+            if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
                 if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
                     cpyR(f.lcl.path + key, f.rmt.path + key)
                 else:
@@ -345,8 +352,6 @@ for f in main:
 
         subprocess.run(["mv", f.lcl.p_tmp, f.lcl.p_old])
         subprocess.run(["mv", f.rmt.p_tmp, f.rmt.p_old])
-    else:
-        subprocess.run(["rm", f.lcl.p_tmp])
-        subprocess.run(["rm", f.rmt.p_tmp])
+
 
 print("Sync Done")
