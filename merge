@@ -355,6 +355,8 @@ for f in main:
         else:
             if not mem_dry:
                 dry_run = False
+            else:
+                dry_run = True
 
             total_jobs = counter
 
@@ -370,29 +372,22 @@ for f in main:
 
         counter = 0
 
-        if recover:
-            print("Running Recovery")
-            for key in sorted(rmt_dif):
-                cpyL(f.lcl.path + key, f.rmt.path + key)
-
-            for key in sorted(lcl_dif):
+        for key in sorted(lcl_dif):
+            if f.lcl.d_dif[key] != 2:
                 cpyR(f.lcl.path + key, f.rmt.path + key)
 
+        for key in sorted(rmt_dif):
+            if f.rmt.d_dif[key] != 2:
+                cpyL(f.lcl.path + key, f.rmt.path + key)
+
+        if recover:
             for key in sorted(inter):
                 if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
                     if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
                         cpyR(f.lcl.path + key, f.rmt.path + key)
-                    else:
+                    elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
                         cpyL(f.lcl.path + key, f.rmt.path + key)
         else:
-            for key in sorted(lcl_dif):
-                if f.lcl.d_dif[key] != 2:
-                    cpyR(f.lcl.path + key, f.rmt.path + key)
-
-            for key in sorted(rmt_dif):
-                if f.rmt.d_dif[key] != 2:
-                    cpyL(f.lcl.path + key, f.rmt.path + key)
-
             for key in sorted(inter):
                 LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
                     f.lcl.path + key, f.rmt.path + key)
