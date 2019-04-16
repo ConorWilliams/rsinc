@@ -46,7 +46,7 @@ os.chdir(drive_dir)
 from config import *
 
 
-LINE_FORMAT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
+LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
 TIME_FMT = '%Y-%m-%d %H:%M:%S'
 
 
