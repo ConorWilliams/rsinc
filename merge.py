@@ -59,9 +59,6 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
 counter = 0
 total_jobs = 0
 
-spin1 = spinner.Spinner()
-spin2 = spinner.Spinner()
-
 ylw = colored.yellow  # delete
 cyn = colored.cyan  # push
 mgt = colored.magenta  # pull
@@ -311,7 +308,8 @@ for f in main:
 
     # make and read files
     print(grn("Indexing: ") + f.path + ' ', end='')
-    spin1.start()
+    spin = spinner.Spinner()
+    spin.start()
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
@@ -319,7 +317,7 @@ for f in main:
     write(f.lcl.p_tmp, f.lcl.d_tmp)
     write(f.rmt.p_tmp, f.lcl.d_tmp)
 
-    spin1.stop()
+    spin.stop()
     print('')
 
     # First run
@@ -432,7 +430,8 @@ for f in main:
     dry_run = mem_dry
 
     print(grn('Saving: ') + f.path + ' state ', end='')
-    spin2.start()
+    spin = spinner.Spinner()
+    spin.start()
 
     # clean up temps
     write(f.rmt.p_old, lsl(f.rmt.path))
@@ -442,7 +441,7 @@ for f in main:
         subprocess.run(["rm", f.lcl.p_tmp])
         subprocess.run(["rm", f.rmt.p_tmp])
 
-    spin2.stop()
+    spin.stop()
     print('')
 
 print('')
