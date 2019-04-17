@@ -34,14 +34,14 @@ import subprocess
 import sys
 import time
 
+print(os.path.abspath(__file__))
+
 from clint.textui import colored, puts
 from datetime import datetime
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
 from config import *
-
-subprocess.run('clear')
 
 print('''/*
  * Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
@@ -54,15 +54,18 @@ TIME_FMT = '%Y-%m-%d %H:%M:%S'
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
-             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False}
+             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
+             '': True}
 
 counter = 0
 total_jobs = 0
 
-ylw = colored.yellow
-cyn = colored.cyan
-red = colored.red
-grn = colored.green
+ylw = colored.yellow  # delete
+cyn = colored.cyan  # push
+mgt = colored.magenta  # pull
+red = colored.red  # error/conflict
+
+grn = colored.green  # normal info
 
 swap = str.maketrans("/", '_')
 
@@ -81,9 +84,12 @@ class data():
         self.s_tmp = set({})
         self.s_dif = set({})
 
+        self.s_low = set({})
+
     def build_dif(self):
         self.s_old = set(self.d_old)
         self.s_tmp = set(self.d_tmp)
+        self.s_low = set(k.lower() for k in self.s_tmp)
 
         deleted = self.s_old.difference(self.s_tmp)
         created = self.s_tmp.difference(self.s_old)
@@ -138,9 +144,12 @@ def write(file, d):
     '''
     Writes dict to json
     '''
-    log('Writing', file)
-    with open(file, 'w') as fp:
-        json.dump(d, fp, sort_keys=True, indent=4)
+    if dry_run:
+        return
+    else:
+        log('Writing', file)
+        with open(file, 'w') as fp:
+            json.dump(d, fp, sort_keys=True, indent=4)
 
 
 def lsl(path):
@@ -194,10 +203,10 @@ def cpyL(dest, source):
     counter += 1
 
     if not dry_run:
-        puts('%d/%d' % (counter, total_jobs) + cyn(' Pull: ') + source)
+        puts('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
-        puts(cyn("Pull: ") + source)
+        puts(mgt("Pull: ") + source)
     return
 
 
@@ -206,6 +215,9 @@ def null(*args):
 
 
 def conflict(source, dest):
+    if skip:
+        puts(red('Skip conflict: ') + source)
+        return
     puts(red('Conflict: ') + source)
     if not dry_run:
         subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
@@ -255,10 +267,12 @@ verbosity = False
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
-parser.add_argument("-f", "--first", help="first run flag", action="store_true")
+parser.add_argument("-f", "--first", help="first sync flag",
+                    action="store_true")
 parser.add_argument(
     "-a", "--auto", help="don't ask permission", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
+parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
@@ -275,6 +289,7 @@ dry_run = args.dry
 verbosity = args.verbose
 recover = args.recovery
 auto = args.auto
+skip = args.skip
 
 # Build main data structure
 for f in folders:
@@ -298,19 +313,18 @@ for f in main:
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
 
-    if not dry_run:
-        write(f.lcl.p_tmp, f.lcl.d_tmp)
-        write(f.rmt.p_tmp, f.lcl.d_tmp)
+    write(f.lcl.p_tmp, f.lcl.d_tmp)
+    write(f.rmt.p_tmp, f.lcl.d_tmp)
 
     # First run
     if args.first:
         print("First run, making index files")
 
-        f.lcl.d_old = lsl(f.lcl.path)
-        f.rmt.d_old = lsl(f.rmt.path)
-        if not dry_run:
-            write(f.lcl.p_old, f.lcl.d_old)
-            write(f.rmt.p_old, f.lcl.d_old)
+        f.lcl.d_old = f.lcl.d_tmp
+        f.rmt.d_old = f.rmt.d_tmp
+
+        write(f.lcl.p_old, f.lcl.d_old)
+        write(f.rmt.p_old, f.lcl.d_old)
 
         recover = True
     else:
@@ -328,8 +342,17 @@ for f in main:
             lcl = set(f.lcl.d_old)
             rmt = set(f.rmt.d_old)
 
-            if len(lcl.symmetric_difference(rmt)) > 0:
+            if len(lcl ^ rmt) > 0:
                 puts(red("ERROR") + " old dicts corrupt, size wrong")
+
+                print("Errors at:", lcl ^ rmt)
+
+                lcl = set(k.lower() for k in lcl)
+                rmt = set(k.lower() for k in rmt)
+
+                if len(lcl ^ rmt) == 0:
+                    puts('Detected: ' + red('CaSE ErrOrs!'))
+
                 continue
 
             for item in f.lcl.d_old.values():
@@ -374,11 +397,19 @@ for f in main:
 
         for key in sorted(lcl_dif):
             if f.lcl.d_dif[key] != 2:
-                cpyR(f.lcl.path + key, f.rmt.path + key)
+                if key.lower() in f.rmt.s_low:
+                    puts(red('ERROR,') + ' case mismatch: ' + key)
+                    puts(red('NOT,') + ' pushing: ' + key)
+                else:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
 
         for key in sorted(rmt_dif):
             if f.rmt.d_dif[key] != 2:
-                cpyL(f.lcl.path + key, f.rmt.path + key)
+                if key.lower() in f.lcl.s_low:
+                    puts(red('ERROR,') + ' case mismatch: ' + key)
+                    puts(red('NOT:') + ' pulling: ' + key)
+                else:
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
 
         if recover:
             for key in sorted(inter):
@@ -394,11 +425,13 @@ for f in main:
 
     dry_run = mem_dry
 
-    # clean up temps
-    if not dry_run:
-        write(f.rmt.p_old, lsl(f.rmt.path))
-        write(f.lcl.p_old, lsl(f.lcl.path))
+    puts(grn('Saving: ') + f.path)
 
+    # clean up temps
+    write(f.rmt.p_old, lsl(f.rmt.path))
+    write(f.lcl.p_old, lsl(f.lcl.path))
+
+    if not dry_run:
         subprocess.run(["rm", f.lcl.p_tmp])
         subprocess.run(["rm", f.rmt.p_tmp])
 
