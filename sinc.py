@@ -34,6 +34,8 @@ import subprocess
 import sys
 import time
 
+cwd = os.getcwd()
+
 from clint.textui import colored
 from datetime import datetime
 
@@ -70,10 +72,8 @@ swap = str.maketrans("/", '_')
 
 
 class data():
-    def __init__(self, base, arg, last):
-        self.path = base + arg + '/'
-        self.p_old = arg.translate(swap) + last + '.json'  # remove / from arg
-        self.p_tmp = arg.translate(swap) + last + '.tmp.json'  # ^
+    def __init__(self, base, arg):
+        self.path = base + arg
 
         self.d_old = {}
         self.d_tmp = {}
@@ -114,8 +114,8 @@ class data():
 
 class direct():
     def __init__(self, arg):
-        self.lcl = data(base_l, arg, '_lcl')
-        self.rmt = data(base_r, arg, '_rmt')
+        self.lcl = data(base_l, arg)
+        self.rmt = data(base_r, arg)
         self.path = arg
 
     def build_dif(self):
@@ -148,7 +148,7 @@ def write(file, d):
     else:
         log('Writing', file)
         with open(file, 'w') as fp:
-            json.dump(d, fp, sort_keys=True, indent=4)
+            json.dump(d, fp, sort_keys=True, indent=2)
 
 
 def lsl(path):
@@ -271,27 +271,283 @@ def get_min(master, path):
     return '/'.join(min_chain)
 
 
-d = lsl(base_l + 'test')
+def cpyR(source, dest):
+    global counter
+    counter += 1
 
-dry_run = False
-verbosity = 1
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
+        subprocess.run(['rclone', 'copyto', source, dest])
+    else:
+        print(cyn("Push: ") + source)
+    return
 
-nest = pack(d)
 
-i = 'dir1/nest1'
+def cpyL(dest, source):
+    global counter
+    counter += 1
 
-r = test(nest, i)
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
+        subprocess.run(['rclone', 'copyto', source, dest])
+    else:
+        print(mgt("Pull: ") + source)
+    return
 
-if r == 1:
-    print('have', i, 'can sync')
-elif r == 0:
-    print('dont have', i, 'must first run then merge')
+
+def null(*args):
+    return
+
+
+def conflict(source, dest):
+    if skip:
+        print(red('Skip conflict: ') + source)
+        return
+    print(red('Conflict: ') + source)
+    if not dry_run:
+        subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
+        subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
+
+        cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
+        cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
+    return
+
+
+def delL(left, right):
+    global counter
+    counter += 1
+
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
+        subprocess.run(['rclone', 'delete', left])
+    else:
+        print(cyn("Delete: ") + left)
+    return
+
+
+def delR(left, right):
+    global counter
+    counter += 1
+
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
+        subprocess.run(['rclone', 'delete', right])
+    else:
+        print(cyn("Delete: ") + right)
+    return
+
+
+def merge_master(master, d):
+    None
+
+
+LOGIC = [[null, cpyL, delL, conflict],
+         [cpyR, conflict, cpyR, conflict],
+         [delR, cpyL, null, cpyL],
+         [conflict, conflict, cpyR, conflict]]
+
+folders = []
+main = []
+
+# read terminal arguments
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("folders", help="folders to sync", nargs='*')
+parser.add_argument("-f", "--first", help="first sync flag",
+                    action="store_true")
+parser.add_argument(
+    "-a", "--auto", help="don't ask permission", action="store_true")
+parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
+parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
+parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
+parser.add_argument("-r", "--recovery", action="store_true",
+                    help="enter recovery mode")
+
+args = parser.parse_args()
+
+if args.folders == []:
+    folders = default_folders
 else:
-    print('must sinc', get_min(nest, i))
+    for folder in args.folders:
+        folders.append(folder)
 
-# print([k for k, v in nest['file'].items()])
+dry_run = args.dry
+verbosity = args.verbose
+recover = args.recovery
+auto = args.auto
+skip = args.skip
+first_run = args.first
 
-# print([k for k, v in nest['fold'].items()])
+# Build main data structure
+for f in folders:
+    main.append(direct(f))
 
+# get the master structures
+if check_exist('master.json'):
+    write('master.json', empty())
 
-folder = os.getcwd()
+master = read('rmt_master.json')
+
+for f in main:
+    print('\n')
+
+    t = test(master, f.path)
+    if t == 1:
+        print('Have', f.path, 'can sync')
+        branch = get_branch(master, f.path)
+    elif t == 0:
+        print('Don\'t have', f.path, 'must -f then merge')
+        first_run = True
+    else:
+        min_path = get_min(master, f.path)
+        print('Dont\'t have', f.path, 'must -f on:', min_path)
+        first_run = True
+        f = direct(min_path)
+
+    exit(1)
+
+    if check_exist(f.path.translate(swap) + '.tmp') == 0:
+        print(red('ERROR') + ', detected crash, found ' +
+              f.path.translate(swap) + '.tmp')
+        recover = True
+
+    # make and read files
+    print(grn("Indexing: ") + f.path + ' ', end='')
+    spin = spinner.Spinner()
+    spin.start()
+
+    f.lcl.d_tmp = lsl(f.lcl.path)
+    f.rmt.d_tmp = lsl(f.rmt.path)
+
+    write(f.path.translate(swap), {})
+
+    spin.stop()
+    print('')
+
+    # First run
+    if first_run:
+        print("First run, making index files")
+
+        f.lcl.d_old = f.lcl.d_tmp
+        f.rmt.d_old = f.rmt.d_tmp
+
+        merge(lcl_master, f.path, pack(f.lcl.d_old))
+        merge(rmt_master, f.path, pack(f.rmt.d_old))
+
+        recover = True
+    else:
+        print('Reading last state')
+
+        if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
+            print(red("ERROR") + " can't find old file, run with -f")
+            continue
+
+        f.lcl.d_old = read(f.lcl.p_old)
+        f.rmt.d_old = read(f.rmt.p_old)
+
+        # Confirm old dicts match
+        if not recover:
+            lcl = set(f.lcl.d_old)
+            rmt = set(f.rmt.d_old)
+
+            if len(lcl ^ rmt) > 0:
+                print(red("ERROR") + " old dicts corrupt, size wrong")
+
+                print("Errors at:", lcl ^ rmt)
+
+                lcl = set(k.lower() for k in lcl)
+                rmt = set(k.lower() for k in rmt)
+
+                if len(lcl ^ rmt) == 0 and CASE_INSENSATIVE:
+                    print('Detected: ' + red('CaSE ErrOrs!'))
+
+                continue
+
+            for item in f.lcl.d_old.values():
+                if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
+                    print(red("ERROR") + " old dicts corrupt at:" + key)
+                    continue
+
+    print('Finding Changes')
+
+    f.build_dif()
+
+    # main logic
+    rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
+    lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
+    inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
+
+    mem_dry = dry_run
+
+    for state in [True, False]:
+        if state:
+            print(grn('Dry pass:'))
+            dry_run = True
+        else:
+            if not mem_dry:
+                dry_run = False
+            else:
+                dry_run = True
+
+            total_jobs = counter
+
+            if counter == 0:
+                print('Nothing to Sync')
+                continue
+            elif mem_dry:
+                continue
+            elif not auto and not strtobool[input('Execute? ')]:
+                continue
+
+            print(grn("Live pass:"))
+
+        counter = 0
+
+        for key in sorted(lcl_dif):
+            if f.lcl.d_dif[key] != 2:
+                if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
+                    print(red('ERROR,') + ' case mismatch: ' + key)
+                    print(red('NOT,') + ' pushing: ' + key)
+                else:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
+
+        for key in sorted(rmt_dif):
+            if f.rmt.d_dif[key] != 2:
+                if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
+                    print(red('ERROR,') + ' case mismatch: ' + key)
+                    print(red('NOT:') + ' pulling: ' + key)
+                else:
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
+
+        if recover:
+            for key in sorted(inter):
+                if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
+                    if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
+                        cpyR(f.lcl.path + key, f.rmt.path + key)
+                    elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
+                        cpyL(f.lcl.path + key, f.rmt.path + key)
+        else:
+            for key in sorted(inter):
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
+
+    dry_run = mem_dry
+
+    print(grn('Saving: ') + f.path + ' state ', end='')
+    spin = spinner.Spinner()
+    spin.start()
+
+    # clean up temps
+    write(f.rmt.p_old, lsl(f.rmt.path))
+    write(f.lcl.p_old, lsl(f.lcl.path))
+
+    if not dry_run:
+        subprocess.run(["rm", f.lcl.p_tmp])
+        subprocess.run(["rm", f.rmt.p_tmp])
+
+    spin.stop()
+    print('')
+
+print('')
+print(grn("All Done!"))
