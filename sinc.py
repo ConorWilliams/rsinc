@@ -183,3 +183,115 @@ def check_exist(path):
         return 0
     else:
         return 1
+
+
+def empty():
+    return {'fold': {}, 'file': {}}
+
+
+def insert(main, chain):
+    if len(chain) == 2:
+        main['file'].update({chain[0]: chain[1]})
+    else:
+        main['fold'].update({chain[0]: empty()})
+        insert(main['fold'][chain[0]], chain[1:])
+
+
+def pack(d):
+    nest = empty()
+
+    for chain in [k.split('/') + [v] for k, v in d.items()]:
+        insert(nest, chain)
+
+    return nest
+
+
+def unpack(nest, d={}, path=''):
+    for k, v in nest['file'].items():
+        d.update({path + k: v})
+
+    for k, v in nest['fold'].items():
+        d.update(unpack(v, d, k + '/'))
+
+    return d
+
+
+def _get_branch(nest, chain):
+    if len(chain) == 0:
+        return nest
+    else:
+        return _get_branch(nest['fold'][chain[0]], chain[1:])
+
+
+def get_branch(nest, path):
+    return _get_branch(nest, path.split('/'))
+
+
+def _merge(nest, new, chain):
+    if len(chain) == 1:
+        nest['fold'][chain[0]].update(new)
+    else:
+        _merge(nest['fold'][chain[0]], new, chain[1:])
+
+
+def merge(nest, path, new):
+    _merge(nest, new, path.split('/'))
+
+
+def _test(nest, chain):
+    if len(chain) == 1:
+        if chain[0] in nest['fold']:
+            return 1
+        else:
+            return 0  # chain depth correct dir missing
+    else:
+        if chain[0] in nest['fold']:
+            return _test(nest['fold'][chain[0]], chain[1:])
+        else:
+            return -1  # chain depth incorrect, too deep
+
+
+def test(master, path):
+    return _test(master, path.split('/'))
+
+
+def _get_min(nest, chain, min_chain):
+    if len(chain) == 1:
+        return min_chain
+    elif chain[0] not in nest['fold']:
+        return min_chain
+    else:
+        min_chain.append(chain[1])
+        return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
+
+
+def get_min(master, path):
+    chain = path.split('/')
+    min_chain = _get_min(master, chain, [chain[0]])
+    return '/'.join(min_chain)
+
+
+d = lsl(base_l + 'test')
+
+dry_run = False
+verbosity = 1
+
+nest = pack(d)
+
+i = 'dir1/nest1'
+
+r = test(nest, i)
+
+if r == 1:
+    print('have', i, 'can sync')
+elif r == 0:
+    print('dont have', i, 'must first run then merge')
+else:
+    print('must sinc', get_min(nest, i))
+
+# print([k for k, v in nest['file'].items()])
+
+# print([k for k, v in nest['fold'].items()])
+
+
+folder = os.getcwd()
