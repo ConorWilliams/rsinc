@@ -8,3 +8,5 @@ base_r = 'onedrive:'
 base_l = '/home/conor/'
 
 default_folders = ['cpp', 'cam']
+
+CASE_INSENSATIVE = True

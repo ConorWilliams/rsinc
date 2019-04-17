@@ -34,13 +34,12 @@ import subprocess
 import sys
 import time
 
-print(os.path.abspath(__file__))
-
-from clint.textui import colored, puts
+from clint.textui import colored
 from datetime import datetime
 
 sys.path.insert(0, drive_dir)
 os.chdir(drive_dir)
+import spinner
 from config import *
 
 print('''/*
@@ -59,6 +58,9 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
 
 counter = 0
 total_jobs = 0
+
+spin1 = spinner.Spinner()
+spin2 = spinner.Spinner()
 
 ylw = colored.yellow  # delete
 cyn = colored.cyan  # push
@@ -191,10 +193,10 @@ def cpyR(source, dest):
     counter += 1
 
     if not dry_run:
-        puts('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
+        print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
-        puts(cyn("Push: ") + source)
+        print(cyn("Push: ") + source)
     return
 
 
@@ -203,10 +205,10 @@ def cpyL(dest, source):
     counter += 1
 
     if not dry_run:
-        puts('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
+        print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
-        puts(mgt("Pull: ") + source)
+        print(mgt("Pull: ") + source)
     return
 
 
@@ -216,9 +218,9 @@ def null(*args):
 
 def conflict(source, dest):
     if skip:
-        puts(red('Skip conflict: ') + source)
+        print(red('Skip conflict: ') + source)
         return
-    puts(red('Conflict: ') + source)
+    print(red('Conflict: ') + source)
     if not dry_run:
         subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
         subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
@@ -233,10 +235,10 @@ def delL(left, right):
     counter += 1
 
     if not dry_run:
-        puts('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
+        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
         subprocess.run(['rclone', 'delete', left])
     else:
-        puts(cyn("Delete: ") + left)
+        print(cyn("Delete: ") + left)
     return
 
 
@@ -245,10 +247,10 @@ def delR(left, right):
     counter += 1
 
     if not dry_run:
-        puts('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
+        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
         subprocess.run(['rclone', 'delete', right])
     else:
-        puts(cyn("Delete: ") + right)
+        print(cyn("Delete: ") + right)
     return
 
 
@@ -304,17 +306,21 @@ for f in main:
     print('\n')
 
     if check_exist(f.lcl.p_tmp) == 0 or check_exist(f.rmt.p_tmp) == 0:
-        puts(red('ERROR') + ', detected crash, found ' + f.path + '.tmp')
+        print(red('ERROR') + ', detected crash, found ' + f.path + '.tmp')
         recover = True
 
     # make and read files
-    puts(grn("Indexing: ") + f.path + '/')
+    print(grn("Indexing: ") + f.path + ' ', end='')
+    spin1.start()
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
 
     write(f.lcl.p_tmp, f.lcl.d_tmp)
     write(f.rmt.p_tmp, f.lcl.d_tmp)
+
+    spin1.stop()
+    print('')
 
     # First run
     if args.first:
@@ -331,7 +337,7 @@ for f in main:
         print('Reading last state')
 
         if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
-            puts(red("ERROR") + " can't find old file, run with -f")
+            print(red("ERROR") + " can't find old file, run with -f")
             continue
 
         f.lcl.d_old = read(f.lcl.p_old)
@@ -343,21 +349,21 @@ for f in main:
             rmt = set(f.rmt.d_old)
 
             if len(lcl ^ rmt) > 0:
-                puts(red("ERROR") + " old dicts corrupt, size wrong")
+                print(red("ERROR") + " old dicts corrupt, size wrong")
 
                 print("Errors at:", lcl ^ rmt)
 
                 lcl = set(k.lower() for k in lcl)
                 rmt = set(k.lower() for k in rmt)
 
-                if len(lcl ^ rmt) == 0:
-                    puts('Detected: ' + red('CaSE ErrOrs!'))
+                if len(lcl ^ rmt) == 0 and CASE_INSENSATIVE:
+                    print('Detected: ' + red('CaSE ErrOrs!'))
 
                 continue
 
             for item in f.lcl.d_old.values():
                 if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
-                    puts(red("ERROR") + " old dicts corrupt at:" + key)
+                    print(red("ERROR") + " old dicts corrupt at:" + key)
                     continue
 
     print('Finding Changes')
@@ -373,7 +379,7 @@ for f in main:
 
     for state in [True, False]:
         if state:
-            puts(grn('Dry pass:'))
+            print(grn('Dry pass:'))
             dry_run = True
         else:
             if not mem_dry:
@@ -391,23 +397,23 @@ for f in main:
             elif not auto and not strtobool[input('Execute? ')]:
                 continue
 
-            puts(grn("Live pass:"))
+            print(grn("Live pass:"))
 
         counter = 0
 
         for key in sorted(lcl_dif):
             if f.lcl.d_dif[key] != 2:
-                if key.lower() in f.rmt.s_low:
-                    puts(red('ERROR,') + ' case mismatch: ' + key)
-                    puts(red('NOT,') + ' pushing: ' + key)
+                if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
+                    print(red('ERROR,') + ' case mismatch: ' + key)
+                    print(red('NOT,') + ' pushing: ' + key)
                 else:
                     cpyR(f.lcl.path + key, f.rmt.path + key)
 
         for key in sorted(rmt_dif):
             if f.rmt.d_dif[key] != 2:
-                if key.lower() in f.lcl.s_low:
-                    puts(red('ERROR,') + ' case mismatch: ' + key)
-                    puts(red('NOT:') + ' pulling: ' + key)
+                if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
+                    print(red('ERROR,') + ' case mismatch: ' + key)
+                    print(red('NOT:') + ' pulling: ' + key)
                 else:
                     cpyL(f.lcl.path + key, f.rmt.path + key)
 
@@ -425,7 +431,8 @@ for f in main:
 
     dry_run = mem_dry
 
-    puts(grn('Saving: ') + f.path)
+    print(grn('Saving: ') + f.path + ' state ', end='')
+    spin2.start()
 
     # clean up temps
     write(f.rmt.p_old, lsl(f.rmt.path))
@@ -435,5 +442,8 @@ for f in main:
         subprocess.run(["rm", f.lcl.p_tmp])
         subprocess.run(["rm", f.rmt.p_tmp])
 
+    spin2.stop()
+    print('')
+
 print('')
-puts(grn("All Done!"))
+print(grn("All Done!"))
