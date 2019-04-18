@@ -25,9 +25,10 @@ SOFTWARE.
 '''
 
 DRIVE_DIR = '/home/conor/drive/'  # where config and data files will be stored
-
 BASE_R = 'onedrive:'
 BASE_L = '/home/conor/'
+
+DEFAULT_DIRS = ['cpp', 'test', 'cam']
 
 CASE_INSENSATIVE = True
 
@@ -343,6 +344,12 @@ cwd = CWD.split('/')
 cwd = cwd[len(BASE_L.split('/')[:-1]):]
 cwd = '/'.join(cwd)
 
+
+if len(cwd) == 0:
+    cwd = DEFAULT_DIRS
+else:
+    cwd = [cwd]
+
 print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
@@ -381,6 +388,7 @@ parser.add_argument("folders", help="folders to sync", nargs='*')
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
+parser.add_argument("-A", "--all", help="sync defaults", action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
 parser.add_argument(
@@ -389,9 +397,12 @@ parser.add_argument(
 args = parser.parse_args()
 
 if args.folders == []:
-    folders = [cwd]
+    folders = cwd
 else:
     folders = args.folders
+
+if args.all:
+    folders = DEFAULT_DIRS
 
 dry_run = args.dry
 verbosity = args.verbose
@@ -418,7 +429,7 @@ for f in main:
     if have(master, f.path):
         print(grn('Have:'), qt(f.path) + ', can sync')
     else:
-        print(ylw('Don\'t have:'), qt(f.path) + ', entering -f mode')
+        print(ylw('Don\'t have:'), qt(f.path) + ', entering first sync mode')
         first_run = True
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
@@ -426,7 +437,7 @@ for f in main:
         recover = True
 
     # make and read files
-    print(grn("Indexing: ") + qt(f.path), end=' ')
+    print(grn("Crawling: ") + qt(f.path), end=' ')
     spin = spinner.Spinner()
     spin.start()
 
@@ -451,8 +462,6 @@ for f in main:
 
         f.lcl.d_old = copy.deepcopy(old)
         f.rmt.d_old = copy.deepcopy(old)
-
-    print('Finding Changes')
 
     f.build_dif()
 
