@@ -24,7 +24,14 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-drive_dir = '/home/conor/drive/'  # where config and data files will be stored
+DRIVE_DIR = '/home/conor/drive/'  # where config and data files will be stored
+
+BASE_R = 'onedrive:'
+BASE_L = '/home/conor/'
+
+default_folders = ['test']
+
+CASE_INSENSATIVE = True
 
 import argparse
 import json
@@ -34,15 +41,15 @@ import subprocess
 import sys
 import time
 
-cwd = os.getcwd()
+CWD = os.getcwd()
 
 from clint.textui import colored
 from datetime import datetime
 
-sys.path.insert(0, drive_dir)
-os.chdir(drive_dir)
+sys.path.insert(0, DRIVE_DIR)
+os.chdir(DRIVE_DIR)
 import spinner
-from config import *
+
 
 print('''/*
  * Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
@@ -73,7 +80,7 @@ swap = str.maketrans("/", '_')
 
 class data():
     def __init__(self, base, arg):
-        self.path = base + arg
+        self.path = base + arg + '/'
 
         self.d_old = {}
         self.d_tmp = {}
@@ -114,8 +121,8 @@ class data():
 
 class direct():
     def __init__(self, arg):
-        self.lcl = data(base_l, arg)
-        self.rmt = data(base_r, arg)
+        self.lcl = data(BASE_L, arg)
+        self.rmt = data(BASE_R, arg)
         self.path = arg
 
     def build_dif(self):
@@ -182,6 +189,7 @@ def check_exist(path):
         log('Checked', path)
         return 0
     else:
+        log('Missing', path)
         return 1
 
 
@@ -193,7 +201,8 @@ def insert(main, chain):
     if len(chain) == 2:
         main['file'].update({chain[0]: chain[1]})
     else:
-        main['fold'].update({chain[0]: empty()})
+        if chain[0] not in main['fold']:
+            main['fold'].update({chain[0]: empty()})
         insert(main['fold'][chain[0]], chain[1:])
 
 
@@ -211,7 +220,7 @@ def unpack(nest, d={}, path=''):
         d.update({path + k: v})
 
     for k, v in nest['fold'].items():
-        d.update(unpack(v, d, k + '/'))
+        d.update(unpack(v, d, path + k + '/'))
 
     return d
 
@@ -227,32 +236,32 @@ def get_branch(nest, path):
     return _get_branch(nest, path.split('/'))
 
 
-def _merge(nest, new, chain):
+def _merge(nest, chain, new):
     if len(chain) == 1:
-        nest['fold'][chain[0]].update(new)
+        nest['fold'].update({chain[0]: new})
     else:
-        _merge(nest['fold'][chain[0]], new, chain[1:])
+        if chain[0] not in nest['fold']:
+            nest['fold'].update({chain[0]: empty()})
+
+        _merge(nest['fold'][chain[0]], chain[1:], new)
 
 
 def merge(nest, path, new):
-    _merge(nest, new, path.split('/'))
+    _merge(nest, path.split('/'), new)
 
 
-def _test(nest, chain):
+def _have(nest, chain):
     if len(chain) == 1:
         if chain[0] in nest['fold']:
             return 1
-        else:
-            return 0  # chain depth correct dir missing
     else:
         if chain[0] in nest['fold']:
-            return _test(nest['fold'][chain[0]], chain[1:])
-        else:
-            return -1  # chain depth incorrect, too deep
+            return _have(nest['fold'][chain[0]], chain[1:])
+    return 0
 
 
-def test(master, path):
-    return _test(master, path.split('/'))
+def have(master, path):
+    return _have(master, path.split('/'))
 
 
 def _get_min(nest, chain, min_chain):
@@ -304,12 +313,14 @@ def conflict(source, dest):
         print(red('Skip conflict: ') + source)
         return
     print(red('Conflict: ') + source)
+
     if not dry_run:
         subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
         subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
 
-        cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
-        cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
+    cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
+    cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
+
     return
 
 
@@ -384,28 +395,23 @@ for f in folders:
     main.append(direct(f))
 
 # get the master structures
-if check_exist('master.json'):
-    write('master.json', empty())
+if check_exist('master_lcl.json'):
+    write('master_lcl.json', empty())
 
-master = read('rmt_master.json')
+if check_exist('master_rmt.json'):
+    write('master_rmt.json', empty())
+
+lcl_master = read('master_lcl.json')
+rmt_master = read('master_rmt.json')
 
 for f in main:
     print('\n')
 
-    t = test(master, f.path)
-    if t == 1:
+    if have(lcl_master, f.path):
         print('Have', f.path, 'can sync')
-        branch = get_branch(master, f.path)
-    elif t == 0:
-        print('Don\'t have', f.path, 'must -f then merge')
-        first_run = True
     else:
-        min_path = get_min(master, f.path)
-        print('Dont\'t have', f.path, 'must -f on:', min_path)
+        print('Don\'t have', f.path, 'entering -f mode')
         first_run = True
-        f = direct(min_path)
-
-    exit(1)
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
         print(red('ERROR') + ', detected crash, found ' +
@@ -420,7 +426,7 @@ for f in main:
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
 
-    write(f.path.translate(swap), {})
+    write(f.path.translate(swap) + '.tmp', {})
 
     spin.stop()
     print('')
@@ -439,12 +445,8 @@ for f in main:
     else:
         print('Reading last state')
 
-        if check_exist(f.lcl.p_old) or check_exist(f.rmt.p_old):
-            print(red("ERROR") + " can't find old file, run with -f")
-            continue
-
-        f.lcl.d_old = read(f.lcl.p_old)
-        f.rmt.d_old = read(f.rmt.p_old)
+        f.lcl.d_old = unpack(get_branch(lcl_master, f.path))
+        f.rmt.d_old = unpack(get_branch(rmt_master, f.path))
 
         # Confirm old dicts match
         if not recover:
@@ -539,12 +541,14 @@ for f in main:
     spin.start()
 
     # clean up temps
-    write(f.rmt.p_old, lsl(f.rmt.path))
-    write(f.lcl.p_old, lsl(f.lcl.path))
+    merge(lcl_master, f.path, pack(lsl(f.lcl.path)))
+    merge(rmt_master, f.path, pack(lsl(f.rmt.path)))
+
+    write('master_lcl.json', lcl_master)
+    write('master_rmt.json', rmt_master)
 
     if not dry_run:
-        subprocess.run(["rm", f.lcl.p_tmp])
-        subprocess.run(["rm", f.rmt.p_tmp])
+        subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
     spin.stop()
     print('')
