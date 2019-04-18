@@ -33,13 +33,13 @@ DEFAULT_DIRS = ['cpp', 'test', 'cam']
 CASE_INSENSATIVE = True
 
 import argparse
-import ujson as json
+import copy
 import os.path
 import re
 import subprocess
 import sys
 import time
-import copy
+import ujson as json
 
 from clint.textui import colored
 from datetime import datetime
@@ -373,14 +373,18 @@ CWD = os.getcwd()
 os.chdir(DRIVE_DIR)
 
 cwd = CWD.split('/')
-cwd = cwd[len(BASE_L.split('/')[:-1]):]
-cwd = '/'.join(cwd)
 
-
-if len(cwd) == 0:
-    cwd = DEFAULT_DIRS
+for elem in BASE_L.split('/')[:-1]:
+    if cwd[0] == elem:
+        cwd.pop(0)
+    else:
+        cwd = DEFAULT_DIRS
+        break
 else:
-    cwd = [cwd]
+    if len(cwd) == 0:
+        cwd = DEFAULT_DIRS
+    else:
+        cwd = ['/'.join(cwd)]
 
 print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
@@ -458,7 +462,7 @@ for f in main:
     min_path = get_min(master, f.path)
 
     if have(master, f.path):
-        print(grn('Have:'), qt(f.path) + ', can sync')
+        print(grn('Have:'), qt(f.path) + ', sync merge mode')
     else:
         print(ylw('Don\'t have:'), qt(f.path) + ', entering first sync mode')
         first_run = True
