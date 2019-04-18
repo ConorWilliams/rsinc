@@ -33,7 +33,7 @@ DEFAULT_DIRS = ['cpp', 'test', 'cam']
 CASE_INSENSATIVE = True
 
 import argparse
-import json
+import ujson as json
 import os.path
 import re
 import subprocess
