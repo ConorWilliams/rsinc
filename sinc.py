@@ -301,6 +301,7 @@ def conflict(source, dest):
     if skip:
         print(red('Skip conflict: ') + source)
         return
+
     print(red('Conflict: ') + source)
 
     if not dry_run:
@@ -362,10 +363,10 @@ def sync(f, lcl_dif, rmt_dif, inter):
                     cpyR(f.lcl.path + key, f.rmt.path + key)
                 elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
                     cpyL(f.lcl.path + key, f.rmt.path + key)
-        else:
-            for key in sorted(inter):
-                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                    f.lcl.path + key, f.rmt.path + key)
+    else:
+        for key in sorted(inter):
+            LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                f.lcl.path + key, f.rmt.path + key)
 
 
 CWD = os.getcwd()
@@ -467,7 +468,7 @@ for f in main:
         print(red('ERROR') + ', detected crash, found a .tmp')
         recover = True
 
-    # make and read files
+    # Scan directories
     print(grn("Crawling: ") + qt(f.path), end=' ')
     spin = spinner.Spinner()
     spin.start()
@@ -494,15 +495,21 @@ for f in main:
         f.lcl.d_old = copy.deepcopy(old)
         f.rmt.d_old = copy.deepcopy(old)
 
-    f.build_dif()
-
     # main logic
+    f.build_dif()
     rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
     lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
     inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
-    mem_dry = dry_run
+    print(inter)
+    print('')
+    print(f.lcl.d_old['d2.txt'])
+    print(f.lcl.d_tmp['d2.txt'])
 
+    print(f.lcl.d_dif['d2.txt'])
+    print(f.rmt.d_dif['d2.txt'])
+
+    mem_dry = dry_run
     print(grn('Dry pass:'))
 
     dry_run = True
@@ -510,15 +517,15 @@ for f in main:
 
     dry_run = mem_dry
     total_jobs = counter
-    counter = 0
 
     if dry_run:
-        print('Found:', total_jobs + 'jobs')
+        print('Found:', total_jobs, 'jobs')
     elif counter == 0:
         print('Nothing to Sync')
     elif not auto and not strtobool[input('Execute? ')]:
         None
     else:
+        counter = 0
         print(grn("Live pass:"))
         sync(f, lcl_dif, rmt_dif, inter)
 
