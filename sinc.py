@@ -337,6 +337,37 @@ def delR(left, right):
     return
 
 
+def sync(f, lcl_dif, rmt_dif, inter):
+    for key in sorted(lcl_dif):
+        if f.lcl.d_dif[key] != 2:
+            if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
+                print(red('ERROR,') + ' case mismatch: ' + key)
+                print(red('NOT,') + ' pushing: ' + key)
+            else:
+                cpyR(f.lcl.path + key, f.rmt.path + key)
+
+    for key in sorted(rmt_dif):
+        if f.rmt.d_dif[key] != 2:
+            if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
+                print(red('ERROR,') + ' case mismatch: ' + key)
+                print(red('NOT:') + ' pulling: ' + key)
+            else:
+                cpyL(f.lcl.path + key, f.rmt.path + key)
+
+    if recover:
+        print(ylw('Running recover'))
+        for key in sorted(inter):
+            if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
+                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
+                elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
+        else:
+            for key in sorted(inter):
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
+
+
 CWD = os.getcwd()
 os.chdir(DRIVE_DIR)
 
@@ -472,60 +503,24 @@ for f in main:
 
     mem_dry = dry_run
 
-    for state in [True, False]:
-        if state:
-            print(grn('Dry pass:'))
-            dry_run = True
-        else:
-            if not mem_dry:
-                dry_run = False
-            else:
-                dry_run = True
+    print(grn('Dry pass:'))
 
-            total_jobs = counter
-
-            if counter == 0:
-                print('Nothing to Sync')
-                continue
-            elif mem_dry:
-                continue
-            elif not auto and not strtobool[input('Execute? ')]:
-                continue
-
-            print(grn("Live pass:"))
-
-        counter = 0
-
-        for key in sorted(lcl_dif):
-            if f.lcl.d_dif[key] != 2:
-                if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
-                    print(red('ERROR,') + ' case mismatch: ' + key)
-                    print(red('NOT,') + ' pushing: ' + key)
-                else:
-                    cpyR(f.lcl.path + key, f.rmt.path + key)
-
-        for key in sorted(rmt_dif):
-            if f.rmt.d_dif[key] != 2:
-                if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
-                    print(red('ERROR,') + ' case mismatch: ' + key)
-                    print(red('NOT:') + ' pulling: ' + key)
-                else:
-                    cpyL(f.lcl.path + key, f.rmt.path + key)
-
-        if recover:
-            print(ylw('Running recover'))
-            for key in sorted(inter):
-                if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
-                    if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
-                        cpyR(f.lcl.path + key, f.rmt.path + key)
-                    elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
-                        cpyL(f.lcl.path + key, f.rmt.path + key)
-        else:
-            for key in sorted(inter):
-                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                    f.lcl.path + key, f.rmt.path + key)
+    dry_run = True
+    sync(f, lcl_dif, rmt_dif, inter)
 
     dry_run = mem_dry
+    total_jobs = counter
+    counter = 0
+
+    if dry_run:
+        print('Found:', total_jobs + 'jobs')
+    elif counter == 0:
+        print('Nothing to Sync')
+    elif not auto and not strtobool[input('Execute? ')]:
+        None
+    else:
+        print(grn("Live pass:"))
+        sync(f, lcl_dif, rmt_dif, inter)
 
     print(grn('Saving:'), qt(min_path), end=' ')
     spin = spinner.Spinner()
