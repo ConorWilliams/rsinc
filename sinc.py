@@ -264,20 +264,20 @@ def have(master, path):
     return _have(master, path.split('/'))
 
 
-def _get_min(nest, chain, min_chain):
-    if len(chain) == 1:
-        return min_chain
-    elif chain[0] not in nest['fold']:
-        return min_chain
-    else:
-        min_chain.append(chain[1])
-        return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
+# def _get_min(nest, chain, min_chain):
+#     if len(chain) == 1:
+#         return min_chain
+#     elif chain[0] not in nest['fold']:
+#         return min_chain
+#     else:
+#         min_chain.append(chain[1])
+#         return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
 
 
-def get_min(master, path):
-    chain = path.split('/')
-    min_chain = _get_min(master, chain, [chain[0]])
-    return '/'.join(min_chain)
+# def get_min(master, path):
+#     chain = path.split('/')
+#     min_chain = _get_min(master, chain, [chain[0]])
+#     return '/'.join(min_chain)
 
 
 def cpyR(source, dest):
@@ -378,7 +378,7 @@ parser.add_argument("-r", "--recovery", action="store_true",
 args = parser.parse_args()
 
 if args.folders == []:
-    folders = default_folders
+    # folders = default_folders
 else:
     for folder in args.folders:
         folders.append(folder)
@@ -408,9 +408,9 @@ for f in main:
     print('\n')
 
     if have(lcl_master, f.path):
-        print('Have', f.path, 'can sync')
+        print(grn('Have'), f.path, 'can sync')
     else:
-        print('Don\'t have', f.path, 'entering -f mode')
+        print(ylw('Don\'t have'), f.path, 'entering -f mode')
         first_run = True
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
@@ -433,13 +433,11 @@ for f in main:
 
     # First run
     if first_run:
-        print("First run, making index files")
-
         f.lcl.d_old = f.lcl.d_tmp
         f.rmt.d_old = f.rmt.d_tmp
 
-        merge(lcl_master, f.path, pack(f.lcl.d_old))
-        merge(rmt_master, f.path, pack(f.rmt.d_old))
+        # merge(lcl_master, f.path, pack(f.lcl.d_old))
+        # merge(rmt_master, f.path, pack(f.rmt.d_old))
 
         recover = True
     else:
