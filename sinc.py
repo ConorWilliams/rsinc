@@ -29,8 +29,6 @@ DRIVE_DIR = '/home/conor/drive/'  # where config and data files will be stored
 BASE_R = 'onedrive:'
 BASE_L = '/home/conor/'
 
-default_folders = ['test']
-
 CASE_INSENSATIVE = True
 
 import argparse
@@ -40,21 +38,26 @@ import re
 import subprocess
 import sys
 import time
-
-CWD = os.getcwd()
+import copy
 
 from clint.textui import colored
 from datetime import datetime
 
 sys.path.insert(0, DRIVE_DIR)
-os.chdir(DRIVE_DIR)
+
 import spinner
 
 
-print('''/*
- * Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
- * This is free software with ABSOLUTELY NO WARRANTY
- */''')
+CWD = os.getcwd()
+os.chdir(DRIVE_DIR)
+
+cwd = CWD.split('/')
+cwd = cwd[len(BASE_L.split('/')[:-1]):]
+cwd = '/'.join(cwd)
+
+print('''
+Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
+This is free software with ABSOLUTELY NO WARRANTY''')
 
 
 LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
@@ -193,6 +196,10 @@ def check_exist(path):
         return 1
 
 
+def qt(string):
+    return '"' + string + '"'
+
+
 def empty():
     return {'fold': {}, 'file': {}}
 
@@ -264,20 +271,20 @@ def have(master, path):
     return _have(master, path.split('/'))
 
 
-# def _get_min(nest, chain, min_chain):
-#     if len(chain) == 1:
-#         return min_chain
-#     elif chain[0] not in nest['fold']:
-#         return min_chain
-#     else:
-#         min_chain.append(chain[1])
-#         return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
+def _get_min(nest, chain, min_chain):
+    if len(chain) == 1:
+        return min_chain
+    elif chain[0] not in nest['fold']:
+        return min_chain
+    else:
+        min_chain.append(chain[1])
+        return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
 
 
-# def get_min(master, path):
-#     chain = path.split('/')
-#     min_chain = _get_min(master, chain, [chain[0]])
-#     return '/'.join(min_chain)
+def get_min(master, path):
+    chain = path.split('/')
+    min_chain = _get_min(master, chain, [chain[0]])
+    return '/'.join(min_chain)
 
 
 def cpyR(source, dest):
@@ -332,7 +339,7 @@ def delL(left, right):
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
         subprocess.run(['rclone', 'delete', left])
     else:
-        print(cyn("Delete: ") + left)
+        print(ylw("Delete: ") + left)
     return
 
 
@@ -344,12 +351,8 @@ def delR(left, right):
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
         subprocess.run(['rclone', 'delete', right])
     else:
-        print(cyn("Delete: ") + right)
+        print(ylw("Delete: ") + right)
     return
-
-
-def merge_master(master, d):
-    None
 
 
 LOGIC = [[null, cpyL, delL, conflict],
@@ -365,20 +368,18 @@ main = []
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
-parser.add_argument("-f", "--first", help="first sync flag",
-                    action="store_true")
-parser.add_argument(
-    "-a", "--auto", help="don't ask permission", action="store_true")
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
+parser.add_argument(
+    "-a", "--auto", help="don't ask permissions", action="store_true")
 
 args = parser.parse_args()
 
 if args.folders == []:
-    # folders = default_folders
+    folders = [cwd]
 else:
     for folder in args.folders:
         folders.append(folder)
@@ -388,38 +389,35 @@ verbosity = args.verbose
 recover = args.recovery
 auto = args.auto
 skip = args.skip
-first_run = args.first
+first_run = False
 
 # Build main data structure
 for f in folders:
     main.append(direct(f))
 
 # get the master structures
-if check_exist('master_lcl.json'):
-    write('master_lcl.json', empty())
+if check_exist('master.json'):
+    write('master.json', empty())
 
-if check_exist('master_rmt.json'):
-    write('master_rmt.json', empty())
-
-lcl_master = read('master_lcl.json')
-rmt_master = read('master_rmt.json')
+master = read('master.json')
 
 for f in main:
-    print('\n')
+    print('')
 
-    if have(lcl_master, f.path):
+    min_path = get_min(master, f.path)
+
+    if have(master, f.path):
         print(grn('Have'), f.path, 'can sync')
     else:
         print(ylw('Don\'t have'), f.path, 'entering -f mode')
         first_run = True
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
-        print(red('ERROR') + ', detected crash, found ' +
-              f.path.translate(swap) + '.tmp')
+        print(red('ERROR') + ', detected crash, found .tmp')
         recover = True
 
     # make and read files
-    print(grn("Indexing: ") + f.path + ' ', end='')
+    print(grn("Indexing: ") + qt(f.path) + ' ', end='')
     spin = spinner.Spinner()
     spin.start()
 
@@ -436,38 +434,14 @@ for f in main:
         f.lcl.d_old = f.lcl.d_tmp
         f.rmt.d_old = f.rmt.d_tmp
 
-        # merge(lcl_master, f.path, pack(f.lcl.d_old))
-        # merge(rmt_master, f.path, pack(f.rmt.d_old))
-
         recover = True
     else:
         print('Reading last state')
 
-        f.lcl.d_old = unpack(get_branch(lcl_master, f.path))
-        f.rmt.d_old = unpack(get_branch(rmt_master, f.path))
+        old = unpack(get_branch(master, f.path))
 
-        # Confirm old dicts match
-        if not recover:
-            lcl = set(f.lcl.d_old)
-            rmt = set(f.rmt.d_old)
-
-            if len(lcl ^ rmt) > 0:
-                print(red("ERROR") + " old dicts corrupt, size wrong")
-
-                print("Errors at:", lcl ^ rmt)
-
-                lcl = set(k.lower() for k in lcl)
-                rmt = set(k.lower() for k in rmt)
-
-                if len(lcl ^ rmt) == 0 and CASE_INSENSATIVE:
-                    print('Detected: ' + red('CaSE ErrOrs!'))
-
-                continue
-
-            for item in f.lcl.d_old.values():
-                if item['bytesize'] != item['bytesize'] or item['datetime'] != item['datetime']:
-                    print(red("ERROR") + " old dicts corrupt at:" + key)
-                    continue
+        f.lcl.d_old = copy.deepcopy(old)
+        f.rmt.d_old = copy.deepcopy(old)
 
     print('Finding Changes')
 
@@ -521,6 +495,7 @@ for f in main:
                     cpyL(f.lcl.path + key, f.rmt.path + key)
 
         if recover:
+            print(ylw('Running recover'))
             for key in sorted(inter):
                 if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
                     if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
@@ -534,16 +509,14 @@ for f in main:
 
     dry_run = mem_dry
 
-    print(grn('Saving: ') + f.path + ' state ', end='')
+    print(grn('Saving:'), qt(min_path), 'state', end=' ')
     spin = spinner.Spinner()
     spin.start()
 
     # clean up temps
-    merge(lcl_master, f.path, pack(lsl(f.lcl.path)))
-    merge(rmt_master, f.path, pack(lsl(f.rmt.path)))
+    merge(master, min_path, pack(lsl(BASE_L + min_path)))
 
-    write('master_lcl.json', lcl_master)
-    write('master_rmt.json', rmt_master)
+    write('master.json', master)
 
     if not dry_run:
         subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
