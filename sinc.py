@@ -48,39 +48,6 @@ sys.path.insert(0, DRIVE_DIR)
 import spinner
 
 
-CWD = os.getcwd()
-os.chdir(DRIVE_DIR)
-
-cwd = CWD.split('/')
-cwd = cwd[len(BASE_L.split('/')[:-1]):]
-cwd = '/'.join(cwd)
-
-print('''
-Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
-This is free software with ABSOLUTELY NO WARRANTY''')
-
-
-LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
-TIME_FMT = '%Y-%m-%d %H:%M:%S'
-
-strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
-             1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
-             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
-             '': True}
-
-counter = 0
-total_jobs = 0
-
-ylw = colored.yellow  # delete
-cyn = colored.cyan  # push
-mgt = colored.magenta  # pull
-red = colored.red  # error/conflict
-
-grn = colored.green  # normal info
-
-swap = str.maketrans("/", '_')
-
-
 class data():
     def __init__(self, base, arg):
         self.path = base + arg + '/'
@@ -138,10 +105,21 @@ def log(*args):
         print(*args)
 
 
+def check_exist(path):
+    if os.path.exists(path):
+        log('Checked', path)
+        return 0
+    else:
+        log('Missing', path)
+        return 1
+
+
+def qt(string):
+    return '"' + string + '"'
+
+
 def read(file):
-    '''
-    Reads json do dict and returns dict
-    '''
+    '''Reads json do dict and returns dict'''
     log('Reading', file)
     with open(file, 'r') as fp:
         d = json.load(fp)
@@ -150,9 +128,7 @@ def read(file):
 
 
 def write(file, d):
-    '''
-    Writes dict to json
-    '''
+    '''Writes dict to json'''
     if dry_run:
         return
     else:
@@ -187,33 +163,26 @@ def lsl(path):
     return d
 
 
-def check_exist(path):
-    if os.path.exists(path):
-        log('Checked', path)
-        return 0
-    else:
-        log('Missing', path)
-        return 1
-
-
-def qt(string):
-    return '"' + string + '"'
+''' Functions for working with packed dictionary's '''
 
 
 def empty():
+    '''Returns dict representing empty directory'''
     return {'fold': {}, 'file': {}}
 
 
-def insert(main, chain):
+def insert(nest, chain):
+    '''Inserts element in chain into packed dict, nest'''
     if len(chain) == 2:
-        main['file'].update({chain[0]: chain[1]})
+        nest['file'].update({chain[0]: chain[1]})
     else:
-        if chain[0] not in main['fold']:
-            main['fold'].update({chain[0]: empty()})
-        insert(main['fold'][chain[0]], chain[1:])
+        if chain[0] not in nest['fold']:
+            nest['fold'].update({chain[0]: empty()})
+        insert(nest['fold'][chain[0]], chain[1:])
 
 
 def pack(d):
+    '''Converts flat dict, d, into packed dict'''
     nest = empty()
 
     for chain in [k.split('/') + [v] for k, v in d.items()]:
@@ -223,6 +192,7 @@ def pack(d):
 
 
 def unpack(nest, d={}, path=''):
+    '''Converts packed dict, nest, into flat dict, d'''
     for k, v in nest['file'].items():
         d.update({path + k: v})
 
@@ -233,6 +203,7 @@ def unpack(nest, d={}, path=''):
 
 
 def _get_branch(nest, chain):
+    '''Returns packed dict at end of chain in packed dict, nest'''
     if len(chain) == 0:
         return nest
     else:
@@ -240,10 +211,12 @@ def _get_branch(nest, chain):
 
 
 def get_branch(nest, path):
+    '''Helper function for _get_branch, converts path to chain'''
     return _get_branch(nest, path.split('/'))
 
 
 def _merge(nest, chain, new):
+    '''Merge packed dict, new, into packed dict, nest, at end of chain'''
     if len(chain) == 1:
         nest['fold'].update({chain[0]: new})
     else:
@@ -254,10 +227,12 @@ def _merge(nest, chain, new):
 
 
 def merge(nest, path, new):
+    '''Helper function for _merge, converts path to chain'''
     _merge(nest, path.split('/'), new)
 
 
 def _have(nest, chain):
+    '''Returns: true if chain is contained in packed dict, nest, else: false'''
     if len(chain) == 1:
         if chain[0] in nest['fold']:
             return 1
@@ -268,10 +243,12 @@ def _have(nest, chain):
 
 
 def have(master, path):
+    '''Helper function for _have, converts path to chain'''
     return _have(master, path.split('/'))
 
 
 def _get_min(nest, chain, min_chain):
+    '''Returns the subset of chain contained in packed dict, nest'''
     if len(chain) == 1:
         return min_chain
     elif chain[0] not in nest['fold']:
@@ -282,9 +259,13 @@ def _get_min(nest, chain, min_chain):
 
 
 def get_min(master, path):
+    '''Helper function for _get_min, converts path to chain'''
     chain = path.split('/')
     min_chain = _get_min(master, chain, [chain[0]])
     return '/'.join(min_chain)
+
+
+''' Functions for moving files about '''
 
 
 def cpyR(source, dest):
@@ -355,13 +336,42 @@ def delR(left, right):
     return
 
 
+CWD = os.getcwd()
+os.chdir(DRIVE_DIR)
+
+cwd = CWD.split('/')
+cwd = cwd[len(BASE_L.split('/')[:-1]):]
+cwd = '/'.join(cwd)
+
+print('''
+Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
+This is free software with ABSOLUTELY NO WARRANTY''')
+
+LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
+TIME_FMT = '%Y-%m-%d %H:%M:%S'
+
+strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
+             1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
+             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
+             '': True}
+
+counter = 0
+total_jobs = 0
+folders = []
+main = []
+
+ylw = colored.yellow  # delete
+cyn = colored.cyan  # push
+mgt = colored.magenta  # pull
+red = colored.red  # error/conflict
+grn = colored.green  # normal info
+
+swap = str.maketrans("/", '_')
+
 LOGIC = [[null, cpyL, delL, conflict],
          [cpyR, conflict, cpyR, conflict],
          [delR, cpyL, null, cpyL],
          [conflict, conflict, cpyR, conflict]]
-
-folders = []
-main = []
 
 # read terminal arguments
 
@@ -381,8 +391,7 @@ args = parser.parse_args()
 if args.folders == []:
     folders = [cwd]
 else:
-    for folder in args.folders:
-        folders.append(folder)
+    folders = args.folders
 
 dry_run = args.dry
 verbosity = args.verbose
