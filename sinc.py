@@ -407,17 +407,17 @@ for f in main:
     min_path = get_min(master, f.path)
 
     if have(master, f.path):
-        print(grn('Have'), f.path, 'can sync')
+        print(grn('Have:'), qt(f.path) + ', can sync')
     else:
-        print(ylw('Don\'t have'), f.path, 'entering -f mode')
+        print(ylw('Don\'t have:'), qt(f.path) + ', entering -f mode')
         first_run = True
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
-        print(red('ERROR') + ', detected crash, found .tmp')
+        print(red('ERROR') + ', detected crash, found a .tmp')
         recover = True
 
     # make and read files
-    print(grn("Indexing: ") + qt(f.path) + ' ', end='')
+    print(grn("Indexing: ") + qt(f.path), end=' ')
     spin = spinner.Spinner()
     spin.start()
 
@@ -509,7 +509,7 @@ for f in main:
 
     dry_run = mem_dry
 
-    print(grn('Saving:'), qt(min_path), 'state', end=' ')
+    print(grn('Saving:'), qt(min_path), end=' ')
     spin = spinner.Spinner()
     spin.start()
 
