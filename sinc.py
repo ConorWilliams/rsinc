@@ -397,7 +397,6 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
 counter = 0
 total_jobs = 0
 folders = []
-main = []
 
 ylw = colored.yellow  # delete
 cyn = colored.cyan  # push
@@ -444,11 +443,11 @@ skip = args.skip
 first_run = False
 
 # Build main data structure
-for f in folders:
-    main.append(direct(f))
+main = [direct(f) for f in folders]
 
 # get the master structures
 if check_exist('master.json'):
+    print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
     write('master.json', empty())
 
 master = read('master.json')
@@ -501,14 +500,6 @@ for f in main:
     lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
     inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
-    print(inter)
-    print('')
-    print(f.lcl.d_old['d2.txt'])
-    print(f.lcl.d_tmp['d2.txt'])
-
-    print(f.lcl.d_dif['d2.txt'])
-    print(f.rmt.d_dif['d2.txt'])
-
     mem_dry = dry_run
     print(grn('Dry pass:'))
 
@@ -535,7 +526,6 @@ for f in main:
 
     # clean up temps
     merge(master, min_path, pack(lsl(BASE_L + min_path)))
-
     write('master.json', master)
 
     if not dry_run:
