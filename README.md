@@ -5,9 +5,7 @@ Run with -h to get help
 
 Run with --dry to do a dry run (no copy, delete or write)
 
-Run with -f on an already syncronised directry to set up
-
-You will need to edit the path in 'merge' to point to where-ever the config file is placed
+You will need to edit the path in 'sinc' to point to where-ever sinc is located and will have to input the basic paths to cloud starage and the local **need to finish this** 
 
 Make sure rclone is installed and working first
 
