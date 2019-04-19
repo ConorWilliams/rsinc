@@ -34,6 +34,7 @@ CASE_INSENSATIVE = True
 
 import argparse
 import copy
+import halo
 import os.path
 import re
 import subprocess
@@ -45,8 +46,6 @@ from clint.textui import colored
 from datetime import datetime
 
 sys.path.insert(0, DRIVE_DIR)
-
-import spinner
 
 
 class data():
@@ -179,13 +178,13 @@ def insert(nest, chain):
     else:
         if chain[0] not in nest['fold']:
             nest['fold'].update({chain[0]: empty()})
+
         insert(nest['fold'][chain[0]], chain[1:])
 
 
 def pack(d):
     '''Converts flat dict, d, into packed dict'''
     nest = empty()
-
     for chain in [k.split('/') + [v] for k, v in d.items()]:
         insert(nest, chain)
 
@@ -278,7 +277,6 @@ def cpyR(source, dest):
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(cyn("Push: ") + source)
-    return
 
 
 def cpyL(dest, source):
@@ -290,7 +288,6 @@ def cpyL(dest, source):
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(mgt("Pull: ") + source)
-    return
 
 
 def null(*args):
@@ -311,8 +308,6 @@ def conflict(source, dest):
     cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
     cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
 
-    return
-
 
 def delL(left, right):
     global counter
@@ -323,7 +318,6 @@ def delL(left, right):
         subprocess.run(['rclone', 'delete', left])
     else:
         print(ylw("Delete: ") + left)
-    return
 
 
 def delR(left, right):
@@ -335,10 +329,10 @@ def delR(left, right):
         subprocess.run(['rclone', 'delete', right])
     else:
         print(ylw("Delete: ") + right)
-    return
 
 
 def sync(f, lcl_dif, rmt_dif, inter):
+    ''' main sync function '''
     for key in sorted(lcl_dif):
         if f.lcl.d_dif[key] != 2:
             if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
@@ -408,6 +402,8 @@ mgt = colored.magenta  # pull
 red = colored.red  # error/conflict
 grn = colored.green  # normal info
 
+spin = halo.Halo(spinner='dots', placement='right', color='yellow')
+
 swap = str.maketrans("/", '_')
 
 LOGIC = [[null, cpyL, delL, conflict],
@@ -416,7 +412,6 @@ LOGIC = [[null, cpyL, delL, conflict],
          [conflict, conflict, cpyR, conflict]]
 
 # read terminal arguments
-
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
@@ -431,22 +426,22 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-if args.folders == []:
+if args.all:
+    folders = DEFAULT_DIRS
+elif args.folders == []:
     folders = cwd
 else:
     folders = args.folders
-
-if args.all:
-    folders = DEFAULT_DIRS
 
 dry_run = args.dry
 verbosity = args.verbose
 recover = args.recovery
 auto = args.auto
 skip = args.skip
+
 first_run = False
 
-# Build main data structure
+# Build  data structure for each directory to sync
 main = [direct(f) for f in folders]
 
 # get the master structures
@@ -458,11 +453,10 @@ master = read('master.json')
 
 for f in main:
     print('')
-
     min_path = get_min(master, f.path)
 
     if have(master, f.path):
-        print(grn('Have:'), qt(f.path) + ', sync merge mode')
+        print(grn('Have:'), qt(f.path) + ', entering sync & merge mode')
     else:
         print(ylw('Don\'t have:'), qt(f.path) + ', entering first sync mode')
         first_run = True
@@ -472,29 +466,23 @@ for f in main:
         recover = True
 
     # Scan directories
-    print(grn("Crawling: ") + qt(f.path), end=' ')
-    spin = spinner.Spinner()
-    spin.start()
+    spin.start(grn("Crawling: ") + qt(f.path))
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
 
     write(f.path.translate(swap) + '.tmp', {})
 
-    spin.stop()
-    print('')
+    spin.stop_and_persist(symbol=('✔'))
 
     # First run
     if first_run:
         f.lcl.d_old = f.lcl.d_tmp
         f.rmt.d_old = f.rmt.d_tmp
-
         recover = True
     else:
-        print('Reading last state')
-
+        print('Reading last state.')
         old = unpack(get_branch(master, f.path))
-
         f.lcl.d_old = copy.deepcopy(old)
         f.rmt.d_old = copy.deepcopy(old)
 
@@ -516,17 +504,13 @@ for f in main:
     if dry_run:
         print('Found:', total_jobs, 'jobs')
     elif counter == 0:
-        print('Nothing to Sync')
-    elif not auto and not strtobool[input('Execute? ')]:
-        None
-    else:
-        counter = 0
+        print('Nothing to Sync.')
+    elif auto and strtobool[input('Execute? ')]:
         print(grn("Live pass:"))
+        counter = 0
         sync(f, lcl_dif, rmt_dif, inter)
 
-    print(grn('Saving:'), qt(min_path), end=' ')
-    spin = spinner.Spinner()
-    spin.start()
+    spin.start(grn('Saving: ') + qt(min_path))
 
     # clean up temps
     merge(master, min_path, pack(lsl(BASE_L + min_path)))
@@ -535,8 +519,7 @@ for f in main:
     if not dry_run:
         subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
-    spin.stop()
-    print('')
+    spin.stop_and_persist(symbol=('✔'))
 
 print('')
 print(grn("All Done!"))
