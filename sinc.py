@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 '''
-merge
+sinc.py
 
 Copyright (c) 2019 C. J. Williams
 
@@ -45,7 +45,9 @@ import ujson as json
 from clint.textui import colored
 from datetime import datetime
 
-sys.path.insert(0, DRIVE_DIR)
+# ****************************************************************************
+# *                                  Classes                                 *
+# ****************************************************************************
 
 
 class data():
@@ -98,6 +100,11 @@ class direct():
     def build_dif(self):
         self.lcl.build_dif()
         self.rmt.build_dif()
+
+
+# ****************************************************************************
+# *                                 Functions                                *
+# ****************************************************************************
 
 
 def log(*args):
@@ -163,7 +170,7 @@ def lsl(path):
     return d
 
 
-''' Functions for working with packed dictionary's '''
+''' ------------ Functions for working with packed dictionary's ------------ '''
 
 
 def empty():
@@ -265,7 +272,7 @@ def get_min(master, path):
     return '/'.join(min_chain)
 
 
-''' Functions for moving files about '''
+''' ------------------- Functions for moving files about ------------------- '''
 
 
 def cpyR(source, dest):
@@ -350,7 +357,6 @@ def sync(f, lcl_dif, rmt_dif, inter):
                 cpyL(f.lcl.path + key, f.rmt.path + key)
 
     if recover:
-        print(ylw('Running recover'))
         for key in sorted(inter):
             if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
                 if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
@@ -362,6 +368,15 @@ def sync(f, lcl_dif, rmt_dif, inter):
             LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
                 f.lcl.path + key, f.rmt.path + key)
 
+
+# ****************************************************************************
+# *                                Definitions                               *
+# ****************************************************************************
+
+
+print('''
+Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
+This is free software with ABSOLUTELY NO WARRANTY''')
 
 CWD = os.getcwd()
 os.chdir(DRIVE_DIR)
@@ -380,9 +395,6 @@ else:
     else:
         cwd = ['/'.join(cwd)]
 
-print('''
-Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
-This is free software with ABSOLUTELY NO WARRANTY''')
 
 LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
 TIME_FMT = '%Y-%m-%d %H:%M:%S'
@@ -391,10 +403,6 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
-
-counter = 0
-total_jobs = 0
-folders = []
 
 ylw = colored.yellow  # delete
 cyn = colored.cyan  # push
@@ -411,7 +419,12 @@ LOGIC = [[null, cpyL, delL, conflict],
          [delR, cpyL, null, cpyL],
          [conflict, conflict, cpyR, conflict]]
 
-# read terminal arguments
+
+# ****************************************************************************
+# *                             Parsing Arguments                            *
+# ****************************************************************************
+
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
@@ -439,27 +452,32 @@ recover = args.recovery
 auto = args.auto
 skip = args.skip
 
-first_run = False
+
+# ****************************************************************************
+# *                               Main Program                               *
+# ****************************************************************************
+
 
 # Build  data structure for each directory to sync
-main = [direct(f) for f in folders]
+directories = [direct(f) for f in folders]
 
-# get the master structures
+# get the master structure
 if check_exist('master.json'):
     print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
     write('master.json', empty())
 
 master = read('master.json')
 
-for f in main:
+for f in directories:
     print('')
     min_path = get_min(master, f.path)
 
+    # determine if first run
     if have(master, f.path):
         print(grn('Have:'), qt(f.path) + ', entering sync & merge mode')
     else:
-        print(ylw('Don\'t have:'), qt(f.path) + ', entering first sync mode')
-        first_run = True
+        print(ylw('Don\'t have:'), qt(f.path) + ', entering first_sync mode')
+        recover = True
 
     if check_exist(f.path.translate(swap) + '.tmp') == 0:
         print(red('ERROR') + ', detected crash, found a .tmp')
@@ -470,32 +488,35 @@ for f in main:
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
-
     write(f.path.translate(swap) + '.tmp', {})
 
     spin.stop_and_persist(symbol=('✔'))
 
-    # First run
-    if first_run:
+    # First run & recover mode
+    if recover:
+        print(ylw('Running'), 'recover/first_sync mode')
         f.lcl.d_old = f.lcl.d_tmp
         f.rmt.d_old = f.rmt.d_tmp
-        recover = True
     else:
         print('Reading last state.')
         old = unpack(get_branch(master, f.path))
+
         f.lcl.d_old = copy.deepcopy(old)
         f.rmt.d_old = copy.deepcopy(old)
 
     # main logic
     f.build_dif()
+
     rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
     lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
     inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
     mem_dry = dry_run
-    print(grn('Dry pass:'))
-
     dry_run = True
+    counter = 0
+    total_jobs = 0
+
+    print(grn('Dry pass:'))
     sync(f, lcl_dif, rmt_dif, inter)
 
     dry_run = mem_dry
@@ -505,7 +526,7 @@ for f in main:
         print('Found:', total_jobs, 'jobs')
     elif counter == 0:
         print('Nothing to Sync.')
-    elif auto and strtobool[input('Execute? ')]:
+    elif auto or strtobool[input('Execute? ')]:
         print(grn("Live pass:"))
         counter = 0
         sync(f, lcl_dif, rmt_dif, inter)
