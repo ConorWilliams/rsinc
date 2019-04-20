@@ -109,17 +109,10 @@ class direct():
 # ****************************************************************************
 
 
-def log(*args):
-    if verbosity:
-        print(*args)
-
-
 def check_exist(path):
     if os.path.exists(path):
-        log('Checked', path)
         return 0
     else:
-        log('Missing', path)
         return 1
 
 
@@ -129,7 +122,6 @@ def qt(string):
 
 def read(file):
     '''Reads json do dict and returns dict'''
-    log('Reading', file)
     with open(file, 'r') as fp:
         d = json.load(fp)
 
@@ -141,7 +133,6 @@ def write(file, d):
     if dry_run:
         return
     else:
-        log('Writing', file)
         with open(file, 'w') as fp:
             json.dump(d, fp, sort_keys=True, indent=2)
 
@@ -186,11 +177,12 @@ def insert(nest, chain):
     '''Inserts element in chain into packed dict, nest'''
     if len(chain) == 2:
         nest['file'].update({chain[0]: chain[1]})
-    else:
-        if chain[0] not in nest['fold']:
-            nest['fold'].update({chain[0]: empty()})
+        return
 
-        insert(nest['fold'][chain[0]], chain[1:])
+    if chain[0] not in nest['fold']:
+        nest['fold'].update({chain[0]: empty()})
+
+    insert(nest['fold'][chain[0]], chain[1:])
 
 
 def pack(d):
@@ -230,11 +222,12 @@ def _merge(nest, chain, new):
     '''Merge packed dict, new, into packed dict, nest, at end of chain'''
     if len(chain) == 1:
         nest['fold'].update({chain[0]: new})
-    else:
-        if chain[0] not in nest['fold']:
-            nest['fold'].update({chain[0]: empty()})
+        return
 
-        _merge(nest['fold'][chain[0]], chain[1:], new)
+    if chain[0] not in nest['fold']:
+        nest['fold'].update({chain[0]: empty()})
+
+    _merge(nest['fold'][chain[0]], chain[1:], new)
 
 
 def merge(nest, path, new):
@@ -244,12 +237,12 @@ def merge(nest, path, new):
 
 def _have(nest, chain):
     '''Returns: true if chain is contained in packed dict, nest, else: false'''
-    if len(chain) == 1:
-        if chain[0] in nest['fold']:
+    if chain[0] in nest['fold']:
+        if len(chain) == 1:
             return 1
-    else:
-        if chain[0] in nest['fold']:
+        else:
             return _have(nest['fold'][chain[0]], chain[1:])
+
     return 0
 
 
@@ -428,7 +421,6 @@ LOGIC = [[null, cpyL, delL, conflict],
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
-parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 parser.add_argument("-D", "--default", help="sync defaults",
@@ -448,8 +440,6 @@ else:
     folders = args.folders
 
 dry_run = args.dry
-verbosity = args.verbose
-recover = args.recovery
 auto = args.auto
 skip = args.skip
 
@@ -471,6 +461,8 @@ master = read('master.json')
 
 for f in directories:
     print('')
+
+    recover = args.recovery
     min_path = get_min(master, f.path)
 
     # determine if first run
@@ -491,7 +483,7 @@ for f in directories:
     f.rmt.d_tmp = lsl(f.rmt.path)
     write(f.path.translate(swap) + '.tmp', {})
 
-    spin.stop_and_persist(symbol=('✔'))
+    spin.stop_and_persist(symbol='✔')
 
     # First run & recover mode
     if recover:
@@ -512,7 +504,6 @@ for f in directories:
     lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
     inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
-    mem_dry = dry_run
     dry_run = True
     counter = 0
     total_jobs = 0
@@ -520,7 +511,7 @@ for f in directories:
     print(grn('Dry pass:'))
     sync(f, lcl_dif, rmt_dif, inter)
 
-    dry_run = mem_dry
+    dry_run = args.dry
     total_jobs = counter
 
     if dry_run:
@@ -541,7 +532,7 @@ for f in directories:
     if not dry_run:
         subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
-    spin.stop_and_persist(symbol=('✔'))
+    spin.stop_and_persist(symbol='✔')
 
 print('')
 print(grn("All Done!"))
