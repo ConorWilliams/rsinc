@@ -24,21 +24,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
+# ****************************************************************************
+# *                                 Settings                                 *
+# ****************************************************************************
+
+
 DRIVE_DIR = '/home/conor/drive/'  # where config and data files will be stored
-BASE_R = 'onedrive:'
-BASE_L = '/home/conor/'
+BASE_R = 'onedrive:'  # root path of remote drive + :
+BASE_L = '/home/conor/'  # path to local drive to mirror remote drive
 
 DEFAULT_DIRS = ['cpp', 'test', 'cam']
 
-CASE_INSENSATIVE = True
+CASE_INSENSATIVE = True  # enables case checking
+HASH_ON = True  # use hash and size to detect file changes, slows down code
 
 import argparse
 import copy
 import halo
-import os.path
-import re
+import os
 import subprocess
-import sys
 import time
 import ujson as json
 
@@ -81,9 +85,7 @@ class data():
             self.d_dif.update({key: 2})
 
         for key in inter:
-            if self.d_old[key]['bytesize'] != self.d_tmp[key]['bytesize']:
-                self.d_dif.update({key: 1})
-            elif self.d_tmp[key]['datetime'] > self.d_old[key]['datetime']:
+            if self.d_old[key]['id'] != self.d_tmp[key]['id']:
                 self.d_dif.update({key: 1})
             else:
                 self.d_dif.update({key: 0})
@@ -149,25 +151,27 @@ def lsl(path):
     Runs rclone lsl on path and returns a dict containing each file with the
     size and last modified time as integers
     '''
-    command = ['rclone', 'lsl', path]
-    result = subprocess.Popen(
-        command, stdout=subprocess.PIPE, universal_newlines=True)
+    command = ['rclone', 'lsjson', '-R', '--files-only', path]
 
-    d = {}
+    if HASH_ON:
+        command += ['--hash']
 
-    for line in iter(result.stdout.readline, ''):
-        g = LINE_FMT.match(line)
+    result = subprocess.Popen(command, stdout=subprocess.PIPE)
 
-        size = int(g.group(1))
-        age = g.group(2) + ' ' + g.group(3)
-        date_time = int(time.mktime(
-            datetime.strptime(age, TIME_FMT).timetuple()))
+    list_of_dicts = json.load(result.stdout)
 
-        filename = g.group(5)
+    out = {}
+    for d in list_of_dicts:
+        time = d['ModTime'][:19]
+        time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
-        d[filename] = {u'bytesize': size, u'datetime': date_time}
+        hashsize = str(d['Size'])
+        if HASH_ON:
+            hashsize += d['Hashes']['SHA-1']
 
-    return d
+        out.update({d['Path']: {'datetime': time, 'id': hashsize}})
+
+    return out
 
 
 ''' ------------ Functions for working with packed dictionary's ------------ '''
@@ -358,10 +362,10 @@ def sync(f, lcl_dif, rmt_dif, inter):
 
     if recover:
         for key in sorted(inter):
-            if f.lcl.d_tmp[key]['bytesize'] != f.rmt.d_tmp[key]['bytesize']:
+            if f.lcl.d_tmp[key]['id'] != f.rmt.d_tmp[key]['id']:
                 if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
                     cpyR(f.lcl.path + key, f.rmt.path + key)
-                elif f.lcl.d_tmp[key]['datetime'] < f.rmt.d_tmp[key]['datetime']:
+                else:
                     cpyL(f.lcl.path + key, f.rmt.path + key)
     else:
         for key in sorted(inter):
@@ -370,7 +374,7 @@ def sync(f, lcl_dif, rmt_dif, inter):
 
 
 # ****************************************************************************
-# *                                Definitions                               *
+# *                           Definitions / Set-up                           *
 # ****************************************************************************
 
 
@@ -394,10 +398,6 @@ else:
         cwd = DEFAULT_DIRS
     else:
         cwd = ['/'.join(cwd)]
-
-
-LINE_FMT = re.compile(u'\s*([0-9]+) ([\d\-]+) ([\d:]+).([\d]+) (.*)')
-TIME_FMT = '%Y-%m-%d %H:%M:%S'
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
@@ -431,7 +431,8 @@ parser.add_argument("folders", help="folders to sync", nargs='*')
 parser.add_argument("-v", "--verbose", action="store_true", help="lots of info")
 parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
-parser.add_argument("-A", "--all", help="sync defaults", action="store_true")
+parser.add_argument("-D", "--default", help="sync defaults",
+                    action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
 parser.add_argument(
@@ -439,7 +440,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-if args.all:
+if args.default:
     folders = DEFAULT_DIRS
 elif args.folders == []:
     folders = cwd
@@ -531,9 +532,9 @@ for f in directories:
         counter = 0
         sync(f, lcl_dif, rmt_dif, inter)
 
+    # clean up temps
     spin.start(grn('Saving: ') + qt(min_path))
 
-    # clean up temps
     merge(master, min_path, pack(lsl(BASE_L + min_path)))
     write('master.json', master)
 
