@@ -145,7 +145,7 @@ def write(file, d):
 
 def lsl(path):
     '''
-    Runs rclone lsl on path and returns a dict containing each file with the
+    Runs rclone lsjson on path and returns a dict containing each file with the
     size and last modified time as integers
     '''
     command = ['rclone', 'lsjson', '-R', '--files-only', path]
@@ -162,9 +162,11 @@ def lsl(path):
         time = d['ModTime'][:19]
         time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
-        hashsize = str(d['Size'])
         if HASH_ON:
+            hashsize = str(d['Size'])
             hashsize += d['Hashes'][HASH_NAME]
+        else:
+            hashsize = d['Size']
 
         out.update({d['Path']: {'datetime': time, 'id': hashsize}})
 
@@ -180,7 +182,7 @@ def empty():
 
 
 def insert(nest, chain):
-    '''Inserts element in chain into packed dict, nest'''
+    '''Inserts element at the end of the chain into packed dict, nest'''
     if len(chain) == 2:
         nest['file'].update({chain[0]: chain[1]})
         return
