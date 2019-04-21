@@ -8,3 +8,5 @@ Run with --dry to do a dry run (no copy, delete or write)
 Make sure rclone is installed and working first
 
 Most things can be fixed running in recovery mode -r
+
+Just edit the few variable at the top of sinc as appropriate for your system then run sinc on the directories you want to synchronise. If you make sinc exacutable and put in /usr/local/bin you can just run sinc inside a directory and it will sinc that directory as appropriate.
