@@ -45,7 +45,6 @@ HASH_NAME = 'SHA-1' # name of hash function, run 'rclone lsjson --hash $path' to
                     # get supported hash functions from your cloud provider.
 
 import argparse
-import copy
 import halo
 import os
 import subprocess
@@ -500,10 +499,10 @@ for f in directories:
         f.rmt.d_old = f.rmt.d_tmp
     else:
         print('Reading last state.')
-        old = unpack(get_branch(master, f.path))
+        branch = get_branch(master, f.path)
 
-        f.lcl.d_old = copy.deepcopy(old)
-        f.rmt.d_old = copy.deepcopy(old)
+        unpack(branch, f.lcl.d_old)
+        unpack(branch, f.rmt.d_old )
 
     # main logic
     f.build_dif()
