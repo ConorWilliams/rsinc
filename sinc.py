@@ -502,7 +502,7 @@ for f in directories:
         branch = get_branch(master, f.path)
 
         unpack(branch, f.lcl.d_old)
-        unpack(branch, f.rmt.d_old )
+        unpack(branch, f.rmt.d_old)
 
     # main logic
     f.build_dif()
