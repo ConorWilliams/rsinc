@@ -33,7 +33,7 @@ DRIVE_DIR = '/home/conor/two_way/'  # where config and data files will be stored
 BASE_R = 'onedrive:'  # root path of remote drive including colon.
 BASE_L = '/home/conor/'  # path to local drive to mirror remote drive.
 
-DEFAULT_DIRS = ['cpp', 'cam'] # folders to sync when ran with -D flag
+DEFAULT_DIRS = ['cpp', 'cam', 'docs'] # folders to sync when ran with -D flag
 
 CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do 
                          # not support upper case letters.
@@ -494,7 +494,7 @@ for f in directories:
 
     # First run & recover mode
     if recover:
-        print(ylw('Running'), 'recover/first_sync mode')
+        print('Running', ylw('recover/first_sync'), 'mode')
         f.lcl.d_old = f.lcl.d_tmp
         f.rmt.d_old = f.rmt.d_tmp
     else:
@@ -530,16 +530,17 @@ for f in directories:
         counter = 0
         sync(f, lcl_dif, rmt_dif, inter)
 
+        # merge into master
+        spin.start(grn('Saving: ') + qt(min_path))
+
+        merge(master, min_path, pack(lsl(BASE_L + min_path)))
+        write('master.json', master)
+
+        spin.stop_and_persist(symbol='✔')
+
     # clean up temps
-    spin.start(grn('Saving: ') + qt(min_path))
-
-    merge(master, min_path, pack(lsl(BASE_L + min_path)))
-    write('master.json', master)
-
     if not dry_run:
-        subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
-
-    spin.stop_and_persist(symbol='✔')
+            subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
 print('')
 print(grn("All Done!"))
