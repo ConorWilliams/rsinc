@@ -83,6 +83,10 @@ class data():
         self.s_low = set({})
 
     def build_dif(self):
+        '''
+        Determines if files have been updated, moved, deleted, created or null 
+        on one side of the system
+        '''
         self.s_old = set(self.d_old)
         self.s_tmp = set(self.d_tmp)
         self.s_low = set(k.lower() for k in self.s_tmp)
@@ -292,6 +296,7 @@ def get_min(master, path):
 
 
 def cpyR(source, dest):
+    '''Copy source (at local) to dest (at remote)'''
     global counter
     counter += 1
 
@@ -303,6 +308,7 @@ def cpyR(source, dest):
 
 
 def cpyL(dest, source):
+    '''Copy source (at remote) to dest (at local)'''
     global counter
     counter += 1
 
@@ -318,6 +324,7 @@ def null(*args):
 
 
 def move(source, dest):
+    '''Move source to dest'''
     global counter
     counter += 1
 
@@ -330,6 +337,7 @@ def move(source, dest):
 
 
 def conflict(source, dest):
+    '''Duplicate, rename and copy conflicts both ways'''
     if skip:
         print(red('Skip conflict: ') + source)
         return
@@ -345,6 +353,7 @@ def conflict(source, dest):
 
 
 def delL(left, right):
+    '''Delete left (at local)'''
     global counter
     counter += 1
 
@@ -356,6 +365,7 @@ def delL(left, right):
 
 
 def delR(left, right):
+    '''Delete left (at remote)'''
     global counter
     counter += 1
 
@@ -367,74 +377,61 @@ def delR(left, right):
 
 
 def sync(f, lcl_dif, rmt_dif, inter):
-    ''' main sync function '''
+    ''' Main sync function '''
     for key in sorted(lcl_dif):
-        if f.lcl.d_dif[key] != DELETED:
-            if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
-                print(red('ERROR,') + ' case mismatch: ' + key)
-                print(red('NOT,') + ' pushing: ' + key)
-            else:
-                cpyR(f.lcl.path + key, f.rmt.path + key)
+        if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
+            print(red('ERROR,') + ' case mismatch: ' + key)
+            print(red('NOT,') + ' pushing: ' + key)
+        else:
+            cpyR(f.lcl.path + key, f.rmt.path + key)
 
     for key in sorted(rmt_dif):
-        if f.rmt.d_dif[key] != DELETED:
-            if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
-                print(red('ERROR,') + ' case mismatch: ' + key)
-                print(red('NOT:') + ' pulling: ' + key)
-            else:
-                cpyL(f.lcl.path + key, f.rmt.path + key)
+        if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
+            print(red('ERROR,') + ' case mismatch: ' + key)
+            print(red('NOT:') + ' pulling: ' + key)
+        else:
+            cpyL(f.lcl.path + key, f.rmt.path + key)
 
-    for key in sorted(inter):
-        i, j, a, b, k1, k2 = match_move(f, key)
-
-        if recover:
-            if f.lcl.d_tmp[k1]['id'] != f.rmt.d_tmp[k2]['id']:
-                if f.lcl.d_tmp[k1]['datetime'] > f.rmt.d_tmp[k2]['datetime']:
-                    cpyR(f.lcl.path + a, f.rmt.path + b)
+    if recover:
+        for key in sorted(inter):
+            if f.lcl.d_tmp[key]['id'] != f.rmt.d_tmp[key]['id']:
+                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
+                    cpyR(f.lcl.path + key, f.rmt.path + key)
                 else:
-                    cpyL(f.lcl.path + a, f.rmt.path + b)
-        else:
-            LOGIC[i][j](f.lcl.path + a, f.rmt.path + b)
-
-
-def match_move(f, key):
-    if f.lcl.d_dif[key] == MOVED:
-        if f.rmt.d_dif[key] != MOVED:
-            if f.rmt.d_dif[key] != DELETED:
-                move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
-
-            k1 = f.lcl.d_mvd[key]
-            k2 = key
-
-            return 0, f.rmt.d_dif[key], f.lcl.d_mvd[key], f.lcl.d_mvd[key], k1, k2
-
-        else:
-            k1 = f.lcl.d_mvd[key]
-            k2 = f.rmt.d_mvd[key]
-
-            if f.lcl.d_tmp[k1]['datetime'] >= f.rmt.d_tmp[k2]['datetime']:
-                move(f.rmt.path + f.rmt.d_mvd[key],
-                     f.rmt.path + f.lcl.d_mvd[key])
-
-                return 0, 0, f.lcl.d_mvd[key], f.lcl.d_mvd[key], lcl_new
-            else:
-                move(f.lcl.path + f.lcl.d_mvd[key],
-                     f.lcl.path + f.rmt.d_mvd[key])
-
-                return 0, 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], lcl_new
-
-    elif f.rmt.d_dif[key] == MOVED:
-
-        if f.lcl.d_dif[key] != DELETED:
-            move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
-
-        k1 = key
-        k2 = f.rmt.d_mvd[key]
-
-        return f.lcl.d_dif[key], 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], k1, k2
-
+                    cpyL(f.lcl.path + key, f.rmt.path + key)
     else:
-        return f.lcl.d_dif[key], f.rmt.d_dif[key], key, key, key, key
+        for key in sorted(inter):
+            if f.lcl.d_dif[key] == MOVED:
+                if f.rmt.d_dif[key] != MOVED:
+                    if f.rmt.d_dif[key] != DELETED:
+                        move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
+
+                    LOGIC[0][f.rmt.d_dif[key]](
+                        f.lcl.path + f.lcl.d_mvd[key],
+                        f.rmt.path + f.lcl.d_mvd[key])
+                else:
+                    k1 = f.lcl.d_mvd[key]
+                    k2 = f.rmt.d_mvd[key]
+
+                    if f.lcl.d_tmp[k1]['datetime'] >= f.rmt.d_tmp[k2]['datetime']:
+                        move(f.rmt.path + f.rmt.d_mvd[key],
+                             f.rmt.path + f.lcl.d_mvd[key])
+                    else:
+                        move(f.lcl.path + f.lcl.d_mvd[key],
+                             f.lcl.path + f.rmt.d_mvd[key])
+
+            elif f.rmt.d_dif[key] == MOVED:
+
+                if f.lcl.d_dif[key] != DELETED:
+                    move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
+
+                LOGIC[f.lcl.d_dif[key]][0](
+                    f.lcl.path + f.rmt.d_mvd[key],
+                    f.rmt.path + f.rmt.d_mvd[key])
+
+            else:
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
 
 
 # ****************************************************************************
