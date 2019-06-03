@@ -29,20 +29,21 @@ SOFTWARE.
 # ****************************************************************************
 
 
-DRIVE_DIR = '/home/conor/two_way/'  # where config and data files will be stored.
+# where config and data files will be stored.
+DRIVE_DIR = '/home/conor/two_way/'
 BASE_R = 'onedrive:'  # root path of remote drive including colon.
 BASE_L = '/home/conor/'  # path to local drive to mirror remote drive.
 
-DEFAULT_DIRS = ['cpp', 'cam', 'docs'] # folders to sync when ran with -D flag
+DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # folders to sync when ran with -D flag
 
-CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do 
-                         # not support upper case letters.
+CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do
+# not support upper case letters.
 
 HASH_ON = True  # use hash and size to detect file changes, slows down code but
-                # improves accuracy.
+# improves accuracy.
 
-HASH_NAME = 'SHA-1' # name of hash function, run 'rclone lsjson --hash $path' to
-                    # get supported hash functions from your cloud provider.
+HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path' to
+# get supported hash functions from your cloud provider.
 
 import argparse
 import halo
@@ -58,6 +59,12 @@ from datetime import datetime
 # *                                  Classes                                 *
 # ****************************************************************************
 
+THESAME = 0
+UPDATED = 1
+DELETED = 2
+CREATED = 3
+MOVED = 4
+
 
 class data():
     def __init__(self, base, arg):
@@ -66,6 +73,8 @@ class data():
         self.d_old = {}
         self.d_tmp = {}
         self.d_dif = {}
+
+        self.d_mvd = {}
 
         self.s_old = set({})
         self.s_tmp = set({})
@@ -84,16 +93,24 @@ class data():
         inter = self.s_tmp.intersection(self.s_old)
 
         for key in created:
-            self.d_dif.update({key: 3})
+            self.d_dif.update({key: CREATED})
 
         for key in deleted:
-            self.d_dif.update({key: 2})
+            self.d_dif.update({key: DELETED})
+
+        for c in created:
+            for d in deleted:
+                if self.d_old[d]['id'] == self.d_tmp[c]['id']:
+                    print(c, 'moved')
+                    self.d_dif.update({d: MOVED})
+                    del self.d_dif[c]
+                    self.d_mvd.update({d: c})
 
         for key in inter:
             if self.d_old[key]['id'] != self.d_tmp[key]['id']:
-                self.d_dif.update({key: 1})
+                self.d_dif.update({key: UPDATED})
             else:
-                self.d_dif.update({key: 0})
+                self.d_dif.update({key: THESAME})
 
         self.s_dif = set(self.d_dif)
 
@@ -115,10 +132,7 @@ class direct():
 
 
 def check_exist(path):
-    if os.path.exists(path):
-        return 0
-    else:
-        return 1
+    return not os.path.exists(path)
 
 
 def qt(string):
@@ -135,9 +149,7 @@ def read(file):
 
 def write(file, d):
     '''Writes dict to json'''
-    if dry_run:
-        return
-    else:
+    if not dry_run:
         with open(file, 'w') as fp:
             json.dump(d, fp, sort_keys=True, indent=2)
 
@@ -305,6 +317,18 @@ def null(*args):
     return
 
 
+def move(source, dest):
+    global counter
+    counter += 1
+
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) +
+              ylw(' Move: ') + source + cyn(' to ') + dest)
+        subprocess.run(['rclone', 'moveto', source, dest])
+    else:
+        print(ylw('Move: ') + source + cyn(' to ') + dest)
+
+
 def conflict(source, dest):
     if skip:
         print(red('Skip conflict: ') + source)
@@ -345,7 +369,7 @@ def delR(left, right):
 def sync(f, lcl_dif, rmt_dif, inter):
     ''' main sync function '''
     for key in sorted(lcl_dif):
-        if f.lcl.d_dif[key] != 2:
+        if f.lcl.d_dif[key] != DELETED:
             if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
                 print(red('ERROR,') + ' case mismatch: ' + key)
                 print(red('NOT,') + ' pushing: ' + key)
@@ -353,7 +377,7 @@ def sync(f, lcl_dif, rmt_dif, inter):
                 cpyR(f.lcl.path + key, f.rmt.path + key)
 
     for key in sorted(rmt_dif):
-        if f.rmt.d_dif[key] != 2:
+        if f.rmt.d_dif[key] != DELETED:
             if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
                 print(red('ERROR,') + ' case mismatch: ' + key)
                 print(red('NOT:') + ' pulling: ' + key)
@@ -369,8 +393,79 @@ def sync(f, lcl_dif, rmt_dif, inter):
                     cpyL(f.lcl.path + key, f.rmt.path + key)
     else:
         for key in sorted(inter):
-            LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                f.lcl.path + key, f.rmt.path + key)
+            if f.lcl.d_dif[key] == MOVED:
+
+                if f.rmt.d_dif[key] != MOVED:
+                    if f.rmt.d_dif[key] != DELETED:
+                        move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
+
+                    LOGIC[0][f.rmt.d_dif[key]](
+                        f.lcl.path + f.lcl.d_mvd[key],
+                        f.rmt.path + f.lcl.d_mvd[key])
+                else:
+                    if f.lcl.d_tmp[f.lcl.d_mvd[key]]['datetime'] >= f.rmt.d_tmp[f.rmt.d_mvd[key]]['datetime']:
+                        move(f.rmt.path + f.rmt.d_mvd[key],
+                             f.rmt.path + f.lcl.d_mvd[key])
+                    else:
+                        move(f.lcl.path + f.lcl.d_mvd[key],
+                             f.lcl.path + f.rmt.d_mvd[key])
+
+            elif f.rmt.d_dif[key] == MOVED:
+
+                if f.lcl.d_dif[key] != DELETED:
+                    move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
+
+                LOGIC[f.lcl.d_dif[key]][0](
+                    f.lcl.path + f.rmt.d_mvd[key],
+                    f.rmt.path + f.rmt.d_mvd[key])
+
+            else:
+                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
+                    f.lcl.path + key, f.rmt.path + key)
+
+
+def match_move(f, key):
+
+    if f.lcl.d_dif[key] == MOVED:
+        tmp_a = f.lcl.d_mvd[key]
+    else
+        tmp_a = key
+
+    if f.rmt.d_dif[key] == MOVED:
+        tmp_b = f.rmt.d_mvd[key]
+    else
+        tmp_b = key
+
+    lcl_new = f.lcl.d_tmp[tmp_a]['datetime'] >= f.rmt.d_tmp[tmp_b]['datetime']
+
+    if f.lcl.d_dif[key] == MOVED:
+        if f.rmt.d_dif[key] != MOVED:
+            if f.rmt.d_dif[key] != DELETED:
+                move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
+
+            return 0, f.rmt.d_dif[key], f.lcl.d_mvd[key], f.lcl.d_mvd[key], lcl_new
+
+        else:
+            if lcl_new:
+                move(f.rmt.path + f.rmt.d_mvd[key],
+                     f.rmt.path + f.lcl.d_mvd[key])
+
+                return 0, 0, f.lcl.d_mvd[key], f.lcl.d_mvd[key], lcl_new
+            else:
+                move(f.lcl.path + f.lcl.d_mvd[key],
+                     f.lcl.path + f.rmt.d_mvd[key])
+
+                return 0, 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], lcl_new
+
+    elif f.rmt.d_dif[key] == MOVED:
+
+        if f.lcl.d_dif[key] != DELETED:
+            move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
+
+        return f.lcl.d_dif[key], 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], lcl_new
+
+    else:
+        return f.lcl.d_dif[key], f.rmt.d_dif[key], key, key, lcl_new
 
 
 # ****************************************************************************
@@ -414,10 +509,11 @@ spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 swap = str.maketrans("/", '_')
 
-LOGIC = [[null, cpyL, delL, conflict],
-         [cpyR, conflict, cpyR, conflict],
-         [delR, cpyL, null, cpyL],
-         [conflict, conflict, cpyR, conflict]]
+LOGIC = [
+        [null, cpyL, delL, conflict],
+        [cpyR, conflict, cpyR, conflict],
+        [delR, cpyL, null, cpyL],
+        [conflict, conflict, cpyR, conflict], ]
 
 
 # ****************************************************************************
@@ -456,9 +552,6 @@ skip = args.skip
 # ****************************************************************************
 
 
-# Build  data structure for each directory to sync
-directories = [direct(f) for f in folders]
-
 # get the master structure
 if check_exist('master.json'):
     print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
@@ -466,7 +559,8 @@ if check_exist('master.json'):
 
 master = read('master.json')
 
-for f in directories:
+for elem in folders:
+    f = direct(elem)
     print('')
 
     recover = args.recovery
@@ -540,7 +634,7 @@ for f in directories:
 
     # clean up temps
     if not dry_run:
-            subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
+        subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
 print('')
 print(grn("All Done!"))
