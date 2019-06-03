@@ -29,21 +29,21 @@ SOFTWARE.
 # ****************************************************************************
 
 
-# where config and data files will be stored.
-DRIVE_DIR = '/home/conor/two_way/'
-BASE_R = 'onedrive:'  # root path of remote drive including colon.
-BASE_L = '/home/conor/'  # path to local drive to mirror remote drive.
+
+DRIVE_DIR = '/home/conor/two_way/' # where config and data files will be stored.
+BASE_R = 'onedrive:'               # root path of remote drive including colon.
+BASE_L = '/home/conor/'            # path to local drive to mirror remote drive.
 
 DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # folders to sync when ran with -D flag
 
 CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do
-# not support upper case letters.
+                         # not support upper case letters.
 
 HASH_ON = True  # use hash and size to detect file changes, slows down code but
-# improves accuracy.
+                # improves accuracy.
 
-HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path' to
-# get supported hash functions from your cloud provider.
+HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path' 
+                     # to get supported hash functions from your cloud provider.
 
 import argparse
 import halo
@@ -465,11 +465,11 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
 
-ylw = colored.yellow  # delete
-cyn = colored.cyan  # push
+ylw = colored.yellow   # delete
+cyn = colored.cyan     # push
 mgt = colored.magenta  # pull
-red = colored.red  # error/conflict
-grn = colored.green  # normal info
+red = colored.red      # error/conflict
+grn = colored.green    # normal info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
@@ -532,7 +532,7 @@ for elem in folders:
     recover = args.recovery
     min_path = get_min(master, f.path)
 
-    # determine if first run
+    # Determine if first run
     if have(master, f.path):
         print(grn('Have:'), qt(f.path) + ', entering sync & merge mode')
     else:
@@ -564,7 +564,7 @@ for elem in folders:
         unpack(branch, f.lcl.d_old)
         unpack(branch, f.rmt.d_old)
 
-    # main logic
+    # Main logic
     f.build_dif()
 
     rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
@@ -590,7 +590,7 @@ for elem in folders:
         counter = 0
         sync(f, lcl_dif, rmt_dif, inter)
 
-        # merge into master
+        # Merge into master
         spin.start(grn('Saving: ') + qt(min_path))
 
         merge(master, min_path, pack(lsl(BASE_L + min_path)))
@@ -598,7 +598,7 @@ for elem in folders:
 
         spin.stop_and_persist(symbol='✔')
 
-    # clean up temps
+    # Clean up temps
     if not dry_run:
         subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
 
