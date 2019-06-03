@@ -384,69 +384,35 @@ def sync(f, lcl_dif, rmt_dif, inter):
             else:
                 cpyL(f.lcl.path + key, f.rmt.path + key)
 
-    if recover:
-        for key in sorted(inter):
-            if f.lcl.d_tmp[key]['id'] != f.rmt.d_tmp[key]['id']:
-                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
-                    cpyR(f.lcl.path + key, f.rmt.path + key)
+    for key in sorted(inter):
+        i, j, a, b, k1, k2 = match_move(f, key)
+
+        if recover:
+            if f.lcl.d_tmp[k1]['id'] != f.rmt.d_tmp[k2]['id']:
+                if f.lcl.d_tmp[k1]['datetime'] > f.rmt.d_tmp[k2]['datetime']:
+                    cpyR(f.lcl.path + a, f.rmt.path + b)
                 else:
-                    cpyL(f.lcl.path + key, f.rmt.path + key)
-    else:
-        for key in sorted(inter):
-            if f.lcl.d_dif[key] == MOVED:
-
-                if f.rmt.d_dif[key] != MOVED:
-                    if f.rmt.d_dif[key] != DELETED:
-                        move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
-
-                    LOGIC[0][f.rmt.d_dif[key]](
-                        f.lcl.path + f.lcl.d_mvd[key],
-                        f.rmt.path + f.lcl.d_mvd[key])
-                else:
-                    if f.lcl.d_tmp[f.lcl.d_mvd[key]]['datetime'] >= f.rmt.d_tmp[f.rmt.d_mvd[key]]['datetime']:
-                        move(f.rmt.path + f.rmt.d_mvd[key],
-                             f.rmt.path + f.lcl.d_mvd[key])
-                    else:
-                        move(f.lcl.path + f.lcl.d_mvd[key],
-                             f.lcl.path + f.rmt.d_mvd[key])
-
-            elif f.rmt.d_dif[key] == MOVED:
-
-                if f.lcl.d_dif[key] != DELETED:
-                    move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
-
-                LOGIC[f.lcl.d_dif[key]][0](
-                    f.lcl.path + f.rmt.d_mvd[key],
-                    f.rmt.path + f.rmt.d_mvd[key])
-
-            else:
-                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                    f.lcl.path + key, f.rmt.path + key)
+                    cpyL(f.lcl.path + a, f.rmt.path + b)
+        else:
+            LOGIC[i][j](f.lcl.path + a, f.rmt.path + b)
 
 
 def match_move(f, key):
-
-    if f.lcl.d_dif[key] == MOVED:
-        tmp_a = f.lcl.d_mvd[key]
-    else
-        tmp_a = key
-
-    if f.rmt.d_dif[key] == MOVED:
-        tmp_b = f.rmt.d_mvd[key]
-    else
-        tmp_b = key
-
-    lcl_new = f.lcl.d_tmp[tmp_a]['datetime'] >= f.rmt.d_tmp[tmp_b]['datetime']
-
     if f.lcl.d_dif[key] == MOVED:
         if f.rmt.d_dif[key] != MOVED:
             if f.rmt.d_dif[key] != DELETED:
                 move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
 
-            return 0, f.rmt.d_dif[key], f.lcl.d_mvd[key], f.lcl.d_mvd[key], lcl_new
+            k1 = f.lcl.d_mvd[key]
+            k2 = key
+
+            return 0, f.rmt.d_dif[key], f.lcl.d_mvd[key], f.lcl.d_mvd[key], k1, k2
 
         else:
-            if lcl_new:
+            k1 = f.lcl.d_mvd[key]
+            k2 = f.rmt.d_mvd[key]
+
+            if f.lcl.d_tmp[k1]['datetime'] >= f.rmt.d_tmp[k2]['datetime']:
                 move(f.rmt.path + f.rmt.d_mvd[key],
                      f.rmt.path + f.lcl.d_mvd[key])
 
@@ -462,10 +428,13 @@ def match_move(f, key):
         if f.lcl.d_dif[key] != DELETED:
             move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
 
-        return f.lcl.d_dif[key], 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], lcl_new
+        k1 = key
+        k2 = f.rmt.d_mvd[key]
+
+        return f.lcl.d_dif[key], 0, f.rmt.d_mvd[key], f.rmt.d_mvd[key], k1, k2
 
     else:
-        return f.lcl.d_dif[key], f.rmt.d_dif[key], key, key, lcl_new
+        return f.lcl.d_dif[key], f.rmt.d_dif[key], key, key, key, key
 
 
 # ****************************************************************************
