@@ -65,7 +65,6 @@ DELETED = 2
 CREATED = 3
 MOVED = 4
 
-
 class data():
     def __init__(self, base, arg):
         self.path = base + arg + '/'
@@ -496,8 +495,8 @@ parser.add_argument("-D", "--default", help="sync defaults",
                     action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
-parser.add_argument(
-    "-a", "--auto", help="don't ask permissions", action="store_true")
+parser.add_argument("-a", "--auto", help="don't ask permissions", 
+                    action="store_true")
 
 args = parser.parse_args()
 
@@ -548,6 +547,7 @@ for elem in folders:
 
     f.lcl.d_tmp = lsl(f.lcl.path)
     f.rmt.d_tmp = lsl(f.rmt.path)
+
     write(f.path.translate(swap) + '.tmp', {})
 
     spin.stop_and_persist(symbol='✔')
