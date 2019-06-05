@@ -357,6 +357,7 @@ def delR(left, right):
 
 
 def r_sinc(lcl, rmt, path_lcl, path_rmt):
+    '''Recovery sync function'''
     for name, file in lcl.names.items():
         if name in rmt.names:
             if file.uid != rmt.names[name].uid:
@@ -378,6 +379,7 @@ def r_sinc(lcl, rmt, path_lcl, path_rmt):
 
 
 def sinc(old, lcl, rmt, path_lcl, path_rmt):
+    '''Normal sync function'''
     if recover:
         r_sinc(lcl, rmt, path_lcl, path_rmt)
         return
@@ -416,8 +418,6 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
             cpyL(path_lcl + name, path_rmt + name)
-
-    return
 
 
 # ****************************************************************************
@@ -478,6 +478,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("folders", help="folders to sync", nargs='*')
 parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
+parser.add_argument("-c", "--clean", action="store_true",
+                    help="clean directories")
 parser.add_argument("-D", "--default", help="sync defaults",
                     action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
@@ -511,15 +513,15 @@ if check_exist('master.json'):
 
 master = read('master.json')
 
-for elem in folders:
+for folder in folders:
 
     old = Flat()
     lcl = Flat()
     rmt = Flat()
 
-    path = elem
-    path_lcl = BASE_L + elem + '/'
-    path_rmt = BASE_R + elem + '/'
+    path = folder
+    path_lcl = BASE_L + folder + '/'
+    path_rmt = BASE_R + folder + '/'
 
     print('')
 
@@ -560,7 +562,6 @@ for elem in folders:
         calc_states(old, rmt)
 
     # Main logic
-
     dry_run = True
     counter = 0
     total_jobs = 0
@@ -573,24 +574,27 @@ for elem in folders:
 
     if dry_run:
         print('Found:', total_jobs, 'job(s)')
-    elif counter == 0:
-        print('Nothing to sync.')
-    elif auto or strtobool[input('Execute? ')]:
-        print(grn("Live pass:"))
-        counter = 0
-        sinc(old, lcl, rmt, path_lcl, path_rmt)
+    else:
+        if counter == 0:
+            print('Nothing to sync.')
+        elif auto or strtobool[input('Execute? ')]:
+            print(grn("Live pass:"))
+            counter = 0
+            sinc(old, lcl, rmt, path_lcl, path_rmt)
 
-    # Merge into master and clean up
-    spin.start(grn('Saving: ') + qt(min_path))
+        # Merge into master and clean up
+        if recover or counter != 0:
+            spin.start(grn('Saving: ') + qt(min_path))
 
-    merge(master, min_path, pack(lsl(BASE_L + min_path)))
-    write('master.json', master)
+            merge(master, min_path, pack(lsl(BASE_L + min_path)))
+            write('master.json', master)
 
-    spin.stop_and_persist(symbol='✔')
+            spin.stop_and_persist(symbol='✔')
 
-    if not dry_run:
-        subprocess.run(["rclone", 'rmdirs', path_rmt])
-        subprocess.run(["rclone", 'rmdirs', path_lcl])
+            if args.clean:
+                subprocess.run(["rclone", 'rmdirs', path_rmt])
+                subprocess.run(["rclone", 'rmdirs', path_lcl])
+
         subprocess.run(["rm", path.translate(swap) + '.tmp'])
 
 print('')
