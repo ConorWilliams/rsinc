@@ -29,7 +29,6 @@ SOFTWARE.
 # ****************************************************************************
 
 
-
 DRIVE_DIR = '/home/conor/rsinc/' # Where config and data files will be stored
 BASE_R = 'onedrive:'             # Root path of remote drive including colon
 BASE_L = '/home/conor/'          # Path to local drive to mirror remote drive
@@ -48,14 +47,15 @@ HASH_NAME = 'SHA-1'  # Name of hash function, run 'rclone lsjson --hash $path'
 BACKUP_ON = True # Moves deleted files into a backup directory
 
 import argparse
-import halo
+from datetime import datetime
 import os
 import subprocess
 import time
 import ujson as json
 
+import halo
 from clint.textui import colored
-from datetime import datetime
+
 
 # ****************************************************************************
 # *                                  Classes                                 *
@@ -399,7 +399,10 @@ def delR(left, right):
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
         LOG('Delete: ' + right)
-        subprocess.run(['rclone', 'delete', right])
+        if BACKUP_ON:
+            subprocess.run(['rclone', 'mv', right])
+        else:
+            subprocess.run(['rclone', 'delete', right])
     else:
         print(ylw("Delete: ") + right)
 
@@ -480,8 +483,6 @@ Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
 
 CWD = os.getcwd()
-os.chdir(DRIVE_DIR)
-
 cwd = CWD.split('/')
 
 for elem in BASE_L.split('/')[:-1]:
@@ -557,15 +558,15 @@ recover = args.recovery
 
 
 # get the master structure
-if not os.path.exists('master.json'):
+if not os.path.exists(DRIVE_DIR + 'master.json'):
     print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
     write('master.json', empty())
 
-master = read('master.json')
+master = read(DRIVE_DIR + 'master.json')
 
-if os.path.exists('rsinc.tmp'):
+if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
     print(red('ERROR') + ', detected a crash, found rsinc.tmp')
-    corrupt = read('rsinc.tmp')['folder']
+    corrupt = read(DRIVE_DIR + 'rsinc.tmp')['folder']
     if corrupt in folders:
         folders.remove(corrupt)
 
@@ -632,8 +633,8 @@ for folder in folders:
             print(grn("Live pass:"))
             counter = 0
 
-            if not os.path.exists('rsinc.tmp'):
-                write('rsinc.tmp', {'folder': folder})
+            if not os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
+                write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
 
             sinc(old, lcl, rmt, path_lcl, path_rmt)
 
@@ -641,7 +642,7 @@ for folder in folders:
         spin.start(grn('Saving: ') + qt(min_path))
 
         merge(master, min_path, pack(lsl(BASE_L + min_path)))
-        write('master.json', master)
+        write(DRIVE_DIR + 'master.json', master)
 
         if args.clean:
             subprocess.run(["rclone", 'rmdirs', path_rmt])
@@ -651,8 +652,8 @@ for folder in folders:
 
         spin.stop_and_persist(symbol='✔')
 
-    if os.path.exists('rsinc.tmp'):
-        subprocess.run(["rm", 'rsinc.tmp'])
+    if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
+        subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
 
     recover = args.recovery
 
