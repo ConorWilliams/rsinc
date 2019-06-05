@@ -123,7 +123,7 @@ def prepend(name, prefix):
 
 def rename(path, name, flat):
     '''
-    Renames file to be transferred if case conflict occurs on other side and 
+    Renames file to be transferred (if case-conflict occurs on other side) and 
     returns the new name
     '''
     new_name = name
@@ -320,11 +320,11 @@ def _have(nest, chain):
     '''Returns: true if chain is contained in packed dict, nest, else: false'''
     if chain[0] in nest['fold']:
         if len(chain) == 1:
-            return 1
+            return True
         else:
             return _have(nest['fold'][chain[0]], chain[1:])
 
-    return 0
+    return False
 
 
 def have(master, path):
