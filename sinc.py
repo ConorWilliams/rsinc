@@ -93,7 +93,11 @@ class Flat():
 # ****************************************************************************
 
 
-def make_states(old, new):
+def calc_states(old, new):
+    '''
+    Calculates if files on one side have been updated, moved, deleted, 
+    created or stayed the same. Arguments are both Flats.
+    '''
     for name, file in new.names.items():
         if name in old.names:
             if old.names[name].uid != file.uid:
@@ -552,8 +556,8 @@ for elem in folders:
         branch = get_branch(master, path)
         unpack(branch, old)
 
-        make_states(old, lcl)
-        make_states(old, rmt)
+        calc_states(old, lcl)
+        calc_states(old, rmt)
 
     # Main logic
 
@@ -576,15 +580,17 @@ for elem in folders:
         counter = 0
         sinc(old, lcl, rmt, path_lcl, path_rmt)
 
-        # Merge into master
-        spin.start(grn('Saving: ') + qt(min_path))
+    # Merge into master and clean up
+    spin.start(grn('Saving: ') + qt(min_path))
 
-        merge(master, min_path, pack(lsl(BASE_L + min_path)))
-        write('master.json', master)
+    merge(master, min_path, pack(lsl(BASE_L + min_path)))
+    write('master.json', master)
 
-        spin.stop_and_persist(symbol='✔')
+    spin.stop_and_persist(symbol='✔')
 
     if not dry_run:
+        subprocess.run(["rclone", 'rmdirs', path_rmt])
+        subprocess.run(["rclone", 'rmdirs', path_lcl])
         subprocess.run(["rm", path.translate(swap) + '.tmp'])
 
 print('')
