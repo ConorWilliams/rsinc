@@ -70,7 +70,7 @@ class File():
         self.name = name
         self.uid = uid
         self.time = time
-        self.state = THESAME
+        self.state = state
         self.moved = False
 
 
@@ -80,10 +80,8 @@ class Flat():
         self.uids = {}
         self.names = {}
 
-    def update(self, name, uid, time):
-        file = File(name, uid, time)
-
-        self.files.append(file)
+    def update(self, name, uid, time, state=THESAME):
+        self.files.append(File(name, uid, time, state))
         self.uids.update({uid: self.files[-1]})
         self.names.update({name: self.files[-1]})
 
@@ -112,7 +110,7 @@ def calc_states(old, new):
 
     for name, file in old.names.items():
         if name not in new.names and file.uid not in new.uids:
-            new.update(name, file.uid, DELETED)
+            new.update(name, file.uid, file.time, DELETED)
 
 
 def check_exist(path):
@@ -275,6 +273,19 @@ def get_min(master, path):
 ''' ------------------- Functions for moving files about ------------------- '''
 
 
+def move(source, dest):
+    '''Move source to dest'''
+    global counter
+    counter += 1
+
+    if not dry_run:
+        print('%d/%d' % (counter, total_jobs) +
+              ylw(' Move: ') + source + cyn(' to ') + dest)
+        subprocess.run(['rclone', 'moveto', source, dest])
+    else:
+        print(ylw('Move: ') + source + cyn(' to ') + dest)
+
+
 def cpyR(source, dest):
     '''Copy source (at local) to dest (at remote)'''
     global counter
@@ -301,19 +312,6 @@ def cpyL(dest, source):
 
 def null(*args):
     return
-
-
-def move(source, dest):
-    '''Move source to dest'''
-    global counter
-    counter += 1
-
-    if not dry_run:
-        print('%d/%d' % (counter, total_jobs) +
-              ylw(' Move: ') + source + cyn(' to ') + dest)
-        subprocess.run(['rclone', 'moveto', source, dest])
-    else:
-        print(ylw('Move: ') + source + cyn(' to ') + dest)
 
 
 def conflict(source, dest):
@@ -514,7 +512,7 @@ if check_exist('master.json'):
 master = read('master.json')
 
 for folder in folders:
-
+    print('')
     old = Flat()
     lcl = Flat()
     rmt = Flat()
@@ -522,8 +520,6 @@ for folder in folders:
     path = folder
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
-
-    print('')
 
     recover = args.recovery
     min_path = get_min(master, path)
@@ -540,7 +536,7 @@ for folder in folders:
         recover = True
 
     # Scan directories
-    spin.start(grn("Crawling: ") + qt(path))
+    spin.start(("Crawling: ") + qt(path))
 
     lcl = lsl(path_lcl)
     rmt = lsl(path_rmt)
@@ -564,19 +560,17 @@ for folder in folders:
     # Main logic
     dry_run = True
     counter = 0
-    total_jobs = 0
 
     print(grn('Dry pass:'))
     sinc(old, lcl, rmt, path_lcl, path_rmt)
 
     dry_run = args.dry
-    total_jobs = counter
 
     if dry_run:
-        print('Found:', total_jobs, 'job(s)')
+        print('Found:', counter, 'job(s)')
     else:
         if counter == 0:
-            print('Nothing to sync.')
+            print('Found:', counter, 'jobs')
         elif auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
@@ -589,13 +583,13 @@ for folder in folders:
             merge(master, min_path, pack(lsl(BASE_L + min_path)))
             write('master.json', master)
 
-            spin.stop_and_persist(symbol='✔')
-
             if args.clean:
                 subprocess.run(["rclone", 'rmdirs', path_rmt])
                 subprocess.run(["rclone", 'rmdirs', path_lcl])
 
+            spin.stop_and_persist(symbol='✔')
+
         subprocess.run(["rm", path.translate(swap) + '.tmp'])
 
 print('')
-print(grn("All Done!"))
+print(grn("All synced!"))
