@@ -88,6 +88,27 @@ class Flat():
         self.lower.add(name.lower())
 
 
+class Log(object):
+    def __init__(self, path):
+        self.path = path + "logs/"
+        self.logs = []
+
+        if not os.path.exists(self.path):
+            subprocess.run(['mkdir', self.path])
+
+    def __call__(self, log):
+        self.logs.append(datetime.now().strftime('%H:%M:%S ') + log)
+
+    def flush(self):
+        day = datetime.now().strftime('%Y-%m-%d')
+        log_file = open(self.path + day, "a+")
+
+        for log in self.logs:
+            log_file.write(log)
+
+        log_file.close()
+
+
 # ****************************************************************************
 # *                                 Functions                                *
 # ****************************************************************************
