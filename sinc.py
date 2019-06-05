@@ -79,11 +79,13 @@ class Flat():
         self.files = []
         self.uids = {}
         self.names = {}
+        self.lower = set()
 
     def update(self, name, uid, time, state=THESAME):
         self.files.append(File(name, uid, time, state))
         self.uids.update({uid: self.files[-1]})
         self.names.update({name: self.files[-1]})
+        self.lower.add(name.lower())
 
 
 # ****************************************************************************
@@ -111,10 +113,6 @@ def calc_states(old, new):
     for name, file in old.names.items():
         if name not in new.names and file.uid not in new.uids:
             new.update(name, file.uid, file.time, DELETED)
-
-
-def check_exist(path):
-    return not os.path.exists(path)
 
 
 def qt(string):
@@ -384,7 +382,17 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
 
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
-            cpyR(path_lcl + name, path_rmt + name)
+            new_name = name
+            while CASE_INSENSATIVE and new_name.lower() in rmt.lower:
+                print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
+                new_name = new_name.split('/')
+                new_name[-1] = '_' + new_name[-1]
+                new_name = '/'.join(new_name)
+
+            if new_name != name:
+                move(path_lcl + name, path_lcl + new_name)
+
+            cpyR(path_lcl + new_name, path_rmt + new_name)
 
         elif name in rmt.names:
             # Neither moved or both moved to same place
@@ -398,7 +406,6 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
             else:
                 # Only lcl moved
                 move(path_rmt + old.uids[file.uid].name, path_rmt + name)
-
                 LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
                     path_lcl + name, path_rmt + name)
 
@@ -407,7 +414,6 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
             rmt_name = rmt.uids[old.names[name].uid].name
 
             move(path_lcl + name, path_lcl + rmt_name)
-
             LOGIC[file.state][THESAME](path_lcl + rmt_name, path_rmt + rmt_name)
 
         else:
@@ -415,7 +421,17 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
 
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
-            cpyL(path_lcl + name, path_rmt + name)
+            new_name = name
+            while CASE_INSENSATIVE and new_name.lower() in lcl.lower:
+                print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
+                new_name = new_name.split('/')
+                new_name[-1] = '_' + new_name[-1]
+                new_name = '/'.join(new_name)
+
+            if new_name != name:
+                move(path_lcl + name, path_lcl + new_name)
+
+            cpyL(path_lcl + new_name, path_rmt + new_name)
 
 
 # ****************************************************************************
@@ -497,7 +513,7 @@ else:
 dry_run = args.dry
 auto = args.auto
 skip = args.skip
-
+recover = args.recovery
 
 # ****************************************************************************
 # *                               Main Program                               *
@@ -505,11 +521,20 @@ skip = args.skip
 
 
 # get the master structure
-if check_exist('master.json'):
+if not os.path.exists('master.json'):
     print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
     write('master.json', empty())
 
 master = read('master.json')
+
+if os.path.exists('TinySinc.tmp'):
+    print(red('ERROR') + ', detected a crash, found TinySinc.tmp')
+    corrupt = read('TinySinc.tmp')['folder']
+    if corrupt in folders:
+        folders.remove(corrupt)
+
+    folders.insert(0, corrupt)
+    recover = True
 
 for folder in folders:
     print('')
@@ -521,7 +546,6 @@ for folder in folders:
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
-    recover = args.recovery
     min_path = get_min(master, path)
 
     # Determine if first run
@@ -531,17 +555,11 @@ for folder in folders:
         print(ylw('Don\'t have:'), qt(path) + ', entering first_sync mode')
         recover = True
 
-    if check_exist(path.translate(swap) + '.tmp') == 0:
-        print(red('ERROR') + ', detected crash, found a .tmp')
-        recover = True
-
     # Scan directories
     spin.start(("Crawling: ") + qt(path))
 
     lcl = lsl(path_lcl)
     rmt = lsl(path_rmt)
-
-    write(path.translate(swap) + '.tmp', {})
 
     spin.stop_and_persist(symbol='✔')
 
@@ -565,6 +583,7 @@ for folder in folders:
     sinc(old, lcl, rmt, path_lcl, path_rmt)
 
     dry_run = args.dry
+    total_jobs = counter
 
     if dry_run:
         print('Found:', counter, 'job(s)')
@@ -572,6 +591,8 @@ for folder in folders:
         if counter == 0:
             print('Found:', counter, 'jobs')
         elif auto or strtobool[input('Execute? ')]:
+            if not os.path.exists('TinySinc.tmp'):
+                write('TinySinc.tmp', {'folder': folder})
             print(grn("Live pass:"))
             counter = 0
             sinc(old, lcl, rmt, path_lcl, path_rmt)
@@ -589,7 +610,10 @@ for folder in folders:
 
             spin.stop_and_persist(symbol='✔')
 
-        subprocess.run(["rm", path.translate(swap) + '.tmp'])
+        if os.path.exists('TinySinc.tmp'):
+            subprocess.run(["rm", 'TinySinc.tmp'])
+
+    recover = args.recovery
 
 print('')
 print(grn("All synced!"))
