@@ -115,6 +115,25 @@ def calc_states(old, new):
             new.update(name, file.uid, file.time, DELETED)
 
 
+def rename(path, name, flat):
+    '''
+    Renames file to be transferred if case conflict occurs on other side and 
+    returns the new name
+    '''
+    new_name = name
+
+    while CASE_INSENSATIVE and new_name.lower() in flat.lower:
+        print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
+        new_name = new_name.split('/')
+        new_name[-1] = '_' + new_name[-1]
+        new_name = '/'.join(new_name)
+
+    if new_name != name:
+        move(path + name, path + new_name)
+
+    return new_name
+
+
 def qt(string):
     return '"' + string + '"'
 
@@ -367,10 +386,12 @@ def r_sinc(lcl, rmt, path_lcl, path_rmt):
             else:
                 move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
         else:
+            new_name = rename(path_lcl, name, rmt)
             cpyR(path_lcl + name, path_rmt + name)
 
     for name, file in rmt.names.items():
         if name not in lcl.names and file.uid not in lcl.uids:
+            new_name = rename(path_rmt, name, lcl)
             cpyL(path_lcl + name, path_rmt + name)
 
 
@@ -382,16 +403,7 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
 
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
-            new_name = name
-            while CASE_INSENSATIVE and new_name.lower() in rmt.lower:
-                print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
-                new_name = new_name.split('/')
-                new_name[-1] = '_' + new_name[-1]
-                new_name = '/'.join(new_name)
-
-            if new_name != name:
-                move(path_lcl + name, path_lcl + new_name)
-
+            new_name = rename(path_lcl, name, rmt)
             cpyR(path_lcl + new_name, path_rmt + new_name)
 
         elif name in rmt.names:
@@ -421,16 +433,7 @@ def sinc(old, lcl, rmt, path_lcl, path_rmt):
 
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
-            new_name = name
-            while CASE_INSENSATIVE and new_name.lower() in lcl.lower:
-                print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
-                new_name = new_name.split('/')
-                new_name[-1] = '_' + new_name[-1]
-                new_name = '/'.join(new_name)
-
-            if new_name != name:
-                move(path_lcl + name, path_lcl + new_name)
-
+            new_name = rename(path_rmt, name, lcl)
             cpyL(path_lcl + new_name, path_rmt + new_name)
 
 
