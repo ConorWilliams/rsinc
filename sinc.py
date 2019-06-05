@@ -97,7 +97,7 @@ class Log(object):
             subprocess.run(['mkdir', self.path])
 
     def __call__(self, log):
-        self.logs.append(datetime.now().strftime('%H:%M:%S ') + log)
+        self.logs.append(datetime.now().strftime('%H:%M:%S ') + log + '\n')
 
     def flush(self):
         day = datetime.now().strftime('%Y-%m-%d')
@@ -136,6 +136,13 @@ def calc_states(old, new):
             new.update(name, file.uid, file.time, DELETED)
 
 
+def prepend(name, prefix):
+    new_name = name.split('/')
+    new_name[-1] = prefix + new_name[-1]
+    new_name = '/'.join(new_name)
+    return new_name
+
+
 def rename(path, name, flat):
     '''
     Renames file to be transferred if case conflict occurs on other side and 
@@ -145,9 +152,7 @@ def rename(path, name, flat):
 
     while CASE_INSENSATIVE and new_name.lower() in flat.lower:
         print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
-        new_name = new_name.split('/')
-        new_name[-1] = '_' + new_name[-1]
-        new_name = '/'.join(new_name)
+        new_name = prepend(new_name, '_')
 
     if new_name != name:
         move(path + name, path + new_name)
@@ -313,24 +318,26 @@ def get_min(master, path):
 
 def move(source, dest):
     '''Move source to dest'''
-    global counter
+    global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
-              ylw(' Move: ') + source + cyn(' to ') + dest)
+              ylw(' Move: ') + source + cyn(' to: ') + dest)
+        LOG('Move: ' + source + ' to: ' + dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
-        print(ylw('Move: ') + source + cyn(' to ') + dest)
+        print(ylw('Move: ') + source + cyn(' to: ') + dest)
 
 
 def cpyR(source, dest):
     '''Copy source (at local) to dest (at remote)'''
-    global counter
+    global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
+        LOG('Push: ' + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(cyn("Push: ") + source)
@@ -338,11 +345,12 @@ def cpyR(source, dest):
 
 def cpyL(dest, source):
     '''Copy source (at remote) to dest (at local)'''
-    global counter
+    global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
+        LOG('Pull: ' + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(mgt("Pull: ") + source)
@@ -354,27 +362,26 @@ def null(*args):
 
 def conflict(source, dest):
     '''Duplicate, rename and copy conflicts both ways'''
-    if skip:
-        print(red('Skip conflict: ') + source)
-        return
+    global LOG
 
     print(red('Conflict: ') + source)
+    LOG('Conflict: ' + source)
 
-    if not dry_run:
-        subprocess.run(['rclone', 'moveto', source, source + ".lcl_conflict"])
-        subprocess.run(['rclone', 'moveto', dest, dest + ".rmt_conflict"])
+    move(source, prepend(source, 'lcl_'))
+    move(dest, prepend(dest, 'rmt_'))
 
-    cpyR(source + ".lcl_conflict", dest + ".lcl_conflict")
-    cpyL(source + ".rmt_conflict", dest + ".rmt_conflict")
+    cpyR(prepend(source, 'lcl_'), prepend(dest, 'lcl_'))
+    cpyL(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
 
 
 def delL(left, right):
     '''Delete left (at local)'''
-    global counter
+    global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
+        LOG('Delete: ' + left)
         subprocess.run(['rclone', 'delete', left])
     else:
         print(ylw("Delete: ") + left)
@@ -382,11 +389,12 @@ def delL(left, right):
 
 def delR(left, right):
     '''Delete left (at remote)'''
-    global counter
+    global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
+        LOG('Delete: ' + right)
         subprocess.run(['rclone', 'delete', right])
     else:
         print(ylw("Delete: ") + right)
@@ -499,6 +507,8 @@ spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 swap = str.maketrans("/", '_')
 
+LOG = Log(DRIVE_DIR)
+
 LOGIC = [
         [null, cpyL, delL, conflict],
         [cpyR, conflict, cpyR, conflict],
@@ -514,7 +524,6 @@ LOGIC = [
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="folders to sync", nargs='*')
-parser.add_argument("-s", "--skip", action="store_true", help="skip conflicts")
 parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
 parser.add_argument("-c", "--clean", action="store_true",
                     help="clean directories")
@@ -536,7 +545,6 @@ else:
 
 dry_run = args.dry
 auto = args.auto
-skip = args.skip
 recover = args.recovery
 
 # ****************************************************************************
@@ -551,9 +559,9 @@ if not os.path.exists('master.json'):
 
 master = read('master.json')
 
-if os.path.exists('TinySinc.tmp'):
-    print(red('ERROR') + ', detected a crash, found TinySinc.tmp')
-    corrupt = read('TinySinc.tmp')['folder']
+if os.path.exists('rsinc.tmp'):
+    print(red('ERROR') + ', detected a crash, found rsinc.tmp')
+    corrupt = read('rsinc.tmp')['folder']
     if corrupt in folders:
         folders.remove(corrupt)
 
@@ -571,6 +579,8 @@ for folder in folders:
     path_rmt = BASE_R + folder + '/'
 
     min_path = get_min(master, path)
+
+    LOG('Syncing: ' + path)
 
     # Determine if first run
     if have(master, path):
@@ -611,31 +621,34 @@ for folder in folders:
 
     if dry_run:
         print('Found:', counter, 'job(s)')
+    elif not recover and counter == 0:
+        print('Found:', counter, 'jobs')
     else:
-        if counter == 0:
-            print('Found:', counter, 'jobs')
-        elif auto or strtobool[input('Execute? ')]:
-            if not os.path.exists('TinySinc.tmp'):
-                write('TinySinc.tmp', {'folder': folder})
+        if auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
+
+            if not os.path.exists('rsinc.tmp'):
+                write('rsinc.tmp', {'folder': folder})
+
             sinc(old, lcl, rmt, path_lcl, path_rmt)
 
         # Merge into master and clean up
-        if recover or counter != 0:
-            spin.start(grn('Saving: ') + qt(min_path))
+        spin.start(grn('Saving: ') + qt(min_path))
 
-            merge(master, min_path, pack(lsl(BASE_L + min_path)))
-            write('master.json', master)
+        merge(master, min_path, pack(lsl(BASE_L + min_path)))
+        write('master.json', master)
 
-            if args.clean:
-                subprocess.run(["rclone", 'rmdirs', path_rmt])
-                subprocess.run(["rclone", 'rmdirs', path_lcl])
+        if args.clean:
+            subprocess.run(["rclone", 'rmdirs', path_rmt])
+            subprocess.run(["rclone", 'rmdirs', path_lcl])
 
-            spin.stop_and_persist(symbol='✔')
+        LOG.flush()
 
-        if os.path.exists('TinySinc.tmp'):
-            subprocess.run(["rm", 'TinySinc.tmp'])
+        spin.stop_and_persist(symbol='✔')
+
+    if os.path.exists('rsinc.tmp'):
+        subprocess.run(["rm", 'rsinc.tmp'])
 
     recover = args.recovery
 
