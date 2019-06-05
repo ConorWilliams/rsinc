@@ -1,6 +1,7 @@
 *.txt
 *.tmp
 *.json
+classes.py
 __pycache__
 __pycache__/
 __pycache__/*

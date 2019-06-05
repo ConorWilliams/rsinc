@@ -29,21 +29,21 @@ SOFTWARE.
 # ****************************************************************************
 
 
-
-DRIVE_DIR = '/home/conor/two_way/' # where config and data files will be stored.
+# where config and data files will be stored.
+DRIVE_DIR = '/home/conor/two_way/'
 BASE_R = 'onedrive:'               # root path of remote drive including colon.
 BASE_L = '/home/conor/'            # path to local drive to mirror remote drive.
 
 DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # folders to sync when ran with -D flag
 
 CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do
-                         # not support upper case letters.
+# not support upper case letters.
 
 HASH_ON = True  # use hash and size to detect file changes, slows down code but
-                # improves accuracy.
+# improves accuracy.
 
-HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path' 
-                     # to get supported hash functions from your cloud provider.
+HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path'
+# to get supported hash functions from your cloud provider.
 
 import argparse
 import halo
@@ -63,75 +63,52 @@ THESAME = 0
 UPDATED = 1
 DELETED = 2
 CREATED = 3
-MOVED = 4
-
-class data():
-    def __init__(self, base, arg):
-        self.path = base + arg + '/'
-
-        self.d_old = {}
-        self.d_tmp = {}
-        self.d_dif = {}
-
-        self.d_mvd = {}
-
-        self.s_old = set({})
-        self.s_tmp = set({})
-        self.s_dif = set({})
-
-        self.s_low = set({})
-
-    def build_dif(self):
-        '''
-        Determines if files have been updated, moved, deleted, created or null 
-        on one side of the system
-        '''
-        self.s_old = set(self.d_old)
-        self.s_tmp = set(self.d_tmp)
-        self.s_low = set(k.lower() for k in self.s_tmp)
-
-        deleted = self.s_old.difference(self.s_tmp)
-        created = self.s_tmp.difference(self.s_old)
-
-        inter = self.s_tmp.intersection(self.s_old)
-
-        for key in created:
-            self.d_dif.update({key: CREATED})
-
-        for key in deleted:
-            self.d_dif.update({key: DELETED})
-
-        for c in created:
-            for d in deleted:
-                if self.d_old[d]['id'] == self.d_tmp[c]['id']:
-                    print(c, 'moved')
-                    self.d_dif.update({d: MOVED})
-                    del self.d_dif[c]
-                    self.d_mvd.update({d: c})
-
-        for key in inter:
-            if self.d_old[key]['id'] != self.d_tmp[key]['id']:
-                self.d_dif.update({key: UPDATED})
-            else:
-                self.d_dif.update({key: THESAME})
-
-        self.s_dif = set(self.d_dif)
 
 
-class direct():
-    def __init__(self, arg):
-        self.lcl = data(BASE_L, arg)
-        self.rmt = data(BASE_R, arg)
-        self.path = arg
+class File():
+    def __init__(self, name, uid, time, state=THESAME):
+        self.name = name
+        self.uid = uid
+        self.time = time
+        self.state = THESAME
+        self.moved = False
 
-    def build_dif(self):
-        self.lcl.build_dif()
-        self.rmt.build_dif()
+
+class Flat():
+    def __init__(self):
+        self.files = []
+        self.uids = {}
+        self.names = {}
+
+    def update(self, name, uid, time):
+        file = File(name, uid, time)
+
+        self.files.append(file)
+        self.uids.update({uid: self.files[-1]})
+        self.names.update({name: self.files[-1]})
 
 
 # ****************************************************************************
 # *                                 Functions                                *
 # ****************************************************************************
+
+
+def make_states(old, new):
+    for name, file in new.names.items():
+        if name in old.names:
+            if old.names[name].uid != file.uid:
+                file.state = UPDATED
+            else:
+                file.state = THESAME
+        elif file.uid in old.uids:
+            file.moved = True
+            file.state = THESAME
+        else:
+            file.state = CREATED
+
+    for name, file in old.names.items():
+        if name not in new.names and file.uid not in new.uids:
+            new.update(name, file.uid, DELETED)
 
 
 def check_exist(path):
@@ -171,7 +148,7 @@ def lsl(path):
 
     list_of_dicts = json.load(result.stdout)
 
-    out = {}
+    out = Flat()
     for d in list_of_dicts:
         time = d['ModTime'][:19]
         time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
@@ -182,7 +159,7 @@ def lsl(path):
         else:
             hashsize = d['Size']
 
-        out.update({d['Path']: {'datetime': time, 'id': hashsize}})
+        out.update(d['Path'], hashsize, time)
 
     return out
 
@@ -207,24 +184,24 @@ def insert(nest, chain):
     insert(nest['fold'][chain[0]], chain[1:])
 
 
-def pack(d):
-    '''Converts flat dict, d, into packed dict'''
+def pack(flat):
+    '''Converts flat, into packed dict'''
     nest = empty()
-    for chain in [k.split('/') + [v] for k, v in d.items()]:
+    for file in flat.files:
+        chain = file.name.split(
+            '/') + [{'uid': file.uid, 'datetime': file.time}]
         insert(nest, chain)
 
     return nest
 
 
-def unpack(nest, d={}, path=''):
-    '''Converts packed dict, nest, into flat dict, d'''
+def unpack(nest, flat, path=''):
+    '''Converts packed dict, nest, into flat'''
     for k, v in nest['file'].items():
-        d.update({path + k: v})
+        flat.update(path + k, v['uid'], v['datetime'])
 
     for k, v in nest['fold'].items():
-        d.update(unpack(v, d, path + k + '/'))
-
-    return d
+        unpack(v, flat, path + k + '/')
 
 
 def _get_branch(nest, chain):
@@ -375,62 +352,68 @@ def delR(left, right):
         print(ylw("Delete: ") + right)
 
 
-def sync(f, lcl_dif, rmt_dif, inter):
-    ''' Main sync function '''
-    for key in sorted(lcl_dif):
-        if CASE_INSENSATIVE and key.lower() in f.rmt.s_low:
-            print(red('ERROR,') + ' case mismatch: ' + key)
-            print(red('NOT,') + ' pushing: ' + key)
-        else:
-            cpyR(f.lcl.path + key, f.rmt.path + key)
-
-    for key in sorted(rmt_dif):
-        if CASE_INSENSATIVE and key.lower() in f.lcl.s_low:
-            print(red('ERROR,') + ' case mismatch: ' + key)
-            print(red('NOT:') + ' pulling: ' + key)
-        else:
-            cpyL(f.lcl.path + key, f.rmt.path + key)
-
-    if recover:
-        for key in sorted(inter):
-            if f.lcl.d_tmp[key]['id'] != f.rmt.d_tmp[key]['id']:
-                if f.lcl.d_tmp[key]['datetime'] > f.rmt.d_tmp[key]['datetime']:
-                    cpyR(f.lcl.path + key, f.rmt.path + key)
+def r_sinc(lcl, rmt, path_lcl, path_rmt):
+    for name, file in lcl.names.items():
+        if name in rmt.names:
+            if file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    cpyR(path_lcl + name, path_rmt + name)
                 else:
-                    cpyL(f.lcl.path + key, f.rmt.path + key)
-    else:
-        for key in sorted(inter):
-            if f.lcl.d_dif[key] == MOVED:
-                if f.rmt.d_dif[key] != MOVED:
-                    if f.rmt.d_dif[key] != DELETED:
-                        move(f.rmt.path + key, f.rmt.path + f.lcl.d_mvd[key])
-
-                    LOGIC[0][f.rmt.d_dif[key]](
-                        f.lcl.path + f.lcl.d_mvd[key],
-                        f.rmt.path + f.lcl.d_mvd[key])
-                else:
-                    k1 = f.lcl.d_mvd[key]
-                    k2 = f.rmt.d_mvd[key]
-
-                    if f.lcl.d_tmp[k1]['datetime'] >= f.rmt.d_tmp[k2]['datetime']:
-                        move(f.rmt.path + f.rmt.d_mvd[key],
-                             f.rmt.path + f.lcl.d_mvd[key])
-                    else:
-                        move(f.lcl.path + f.lcl.d_mvd[key],
-                             f.lcl.path + f.rmt.d_mvd[key])
-
-            elif f.rmt.d_dif[key] == MOVED:
-
-                if f.lcl.d_dif[key] != DELETED:
-                    move(f.lcl.path + key, f.lcl.path + f.rmt.d_mvd[key])
-
-                LOGIC[f.lcl.d_dif[key]][0](
-                    f.lcl.path + f.rmt.d_mvd[key],
-                    f.rmt.path + f.rmt.d_mvd[key])
-
+                    cpyL(path_lcl + name, path_rmt + name)
+        elif file.uid in rmt.uids:
+            if file.time > rmt.uids[file.uid].time:
+                move(path_rmt + rmt.uids[file.uid].name, path_rmt + name)
             else:
-                LOGIC[f.lcl.d_dif[key]][f.rmt.d_dif[key]](
-                    f.lcl.path + key, f.rmt.path + key)
+                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+        else:
+            cpyR(path_lcl + name, path_rmt + name)
+
+    for name, file in rmt.names.items():
+        if name not in lcl.names and file.uid not in lcl.uids:
+            cpyL(path_lcl + name, path_rmt + name)
+
+
+def sinc(old, lcl, rmt, path_lcl, path_rmt):
+    if recover:
+        r_sinc(lcl, rmt, path_lcl, path_rmt)
+        return
+
+    for name, file in sorted(lcl.names.items()):
+        if file.state == CREATED:
+            cpyR(path_lcl + name, path_rmt + name)
+
+        elif name in rmt.names:
+            # Neither moved or both moved to same place
+            LOGIC[file.state][rmt.names[name].state](
+                path_lcl + name, path_rmt + name)
+
+        elif file.moved == True:
+            if file.uid in rmt.uids and rmt.uids[file.uid].moved == True:
+                # Both moved to different places
+                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+            else:
+                # Only lcl moved
+                move(path_rmt + old.uids[file.uid].name, path_rmt + name)
+
+                LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
+                    path_lcl + name, path_rmt + name)
+
+        elif old.names[name].uid in rmt.uids:
+            # Only rmt has moved
+            rmt_name = rmt.uids[old.names[name].uid].name
+
+            move(path_lcl + name, path_lcl + rmt_name)
+
+            LOGIC[file.state][THESAME](path_lcl + rmt_name, path_rmt + rmt_name)
+
+        else:
+            print(red('WARNING:'), 'fell out of switch in sinc function')
+
+    for name, file in sorted(rmt.names.items()):
+        if file.state == CREATED:
+            cpyL(path_lcl + name, path_rmt + name)
+
+    return
 
 
 # ****************************************************************************
@@ -495,7 +478,7 @@ parser.add_argument("-D", "--default", help="sync defaults",
                     action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
                     help="enter recovery mode")
-parser.add_argument("-a", "--auto", help="don't ask permissions", 
+parser.add_argument("-a", "--auto", help="don't ask permissions",
                     action="store_true")
 
 args = parser.parse_args()
@@ -525,70 +508,73 @@ if check_exist('master.json'):
 master = read('master.json')
 
 for elem in folders:
-    f = direct(elem)
+
+    old = Flat()
+    lcl = Flat()
+    rmt = Flat()
+
+    path = elem
+    path_lcl = BASE_L + elem + '/'
+    path_rmt = BASE_R + elem + '/'
+
     print('')
 
     recover = args.recovery
-    min_path = get_min(master, f.path)
+    min_path = get_min(master, path)
 
     # Determine if first run
-    if have(master, f.path):
-        print(grn('Have:'), qt(f.path) + ', entering sync & merge mode')
+    if have(master, path):
+        print(grn('Have:'), qt(path) + ', entering sync & merge mode')
     else:
-        print(ylw('Don\'t have:'), qt(f.path) + ', entering first_sync mode')
+        print(ylw('Don\'t have:'), qt(path) + ', entering first_sync mode')
         recover = True
 
-    if check_exist(f.path.translate(swap) + '.tmp') == 0:
+    if check_exist(path.translate(swap) + '.tmp') == 0:
         print(red('ERROR') + ', detected crash, found a .tmp')
         recover = True
 
     # Scan directories
-    spin.start(grn("Crawling: ") + qt(f.path))
+    spin.start(grn("Crawling: ") + qt(path))
 
-    f.lcl.d_tmp = lsl(f.lcl.path)
-    f.rmt.d_tmp = lsl(f.rmt.path)
+    lcl = lsl(path_lcl)
+    rmt = lsl(path_rmt)
 
-    write(f.path.translate(swap) + '.tmp', {})
+    write(path.translate(swap) + '.tmp', {})
 
     spin.stop_and_persist(symbol='✔')
 
     # First run & recover mode
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
-        f.lcl.d_old = f.lcl.d_tmp
-        f.rmt.d_old = f.rmt.d_tmp
     else:
         print('Reading last state.')
-        branch = get_branch(master, f.path)
 
-        unpack(branch, f.lcl.d_old)
-        unpack(branch, f.rmt.d_old)
+        branch = get_branch(master, path)
+        unpack(branch, old)
+
+        make_states(old, lcl)
+        make_states(old, rmt)
 
     # Main logic
-    f.build_dif()
-
-    rmt_dif = f.rmt.s_dif.difference(f.lcl.s_dif)  # in rmt only
-    lcl_dif = f.lcl.s_dif.difference(f.rmt.s_dif)  # in lcl only
-    inter = f.rmt.s_dif.intersection(f.lcl.s_dif)  # in both
 
     dry_run = True
     counter = 0
     total_jobs = 0
 
     print(grn('Dry pass:'))
-    sync(f, lcl_dif, rmt_dif, inter)
+    sinc(old, lcl, rmt, path_lcl, path_rmt)
 
     dry_run = args.dry
     total_jobs = counter
 
     if dry_run:
-        print('Found:', total_jobs, 'jobs')
+        print('Found:', total_jobs, 'job(s)')
     elif counter == 0:
-        print('Nothing to Sync.')
+        print('Nothing to sync.')
     elif auto or strtobool[input('Execute? ')]:
         print(grn("Live pass:"))
         counter = 0
-        sync(f, lcl_dif, rmt_dif, inter)
+        sinc(old, lcl, rmt, path_lcl, path_rmt)
 
         # Merge into master
         spin.start(grn('Saving: ') + qt(min_path))
@@ -598,9 +584,8 @@ for elem in folders:
 
         spin.stop_and_persist(symbol='✔')
 
-    # Clean up temps
     if not dry_run:
-        subprocess.run(["rm", f.path.translate(swap) + '.tmp'])
+        subprocess.run(["rm", path.translate(swap) + '.tmp'])
 
 print('')
 print(grn("All Done!"))
