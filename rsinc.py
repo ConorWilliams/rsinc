@@ -186,6 +186,71 @@ def lsl(path):
 
     return out
 
+def r_sinc(lcl, rmt, path_lcl, path_rmt):
+    '''Recovery sync function'''
+    for name, file in lcl.names.items():
+        if name in rmt.names:
+            if file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    push(path_lcl + name, path_rmt + name)
+                else:
+                    pull(path_lcl + name, path_rmt + name)
+        elif file.uid in rmt.uids:
+            if file.time > rmt.uids[file.uid].time:
+                move(path_rmt + rmt.uids[file.uid].name, path_rmt + name)
+            else:
+                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+        else:
+            new_name = rename(path_lcl, name, rmt)
+            push(path_lcl + name, path_rmt + name)
+
+    for name, file in rmt.names.items():
+        if name not in lcl.names and file.uid not in lcl.uids:
+            new_name = rename(path_rmt, name, lcl)
+            pull(path_lcl + name, path_rmt + name)
+
+
+def sinc(old, lcl, rmt, path_lcl, path_rmt):
+    '''Normal sync function'''
+    if recover:
+        r_sinc(lcl, rmt, path_lcl, path_rmt)
+        return
+
+    for name, file in sorted(lcl.names.items()):
+        if file.state == CREATED:
+            new_name = rename(path_lcl, name, rmt)
+            push(path_lcl + new_name, path_rmt + new_name)
+
+        elif name in rmt.names:
+            # Neither moved or both moved to same place
+            LOGIC[file.state][rmt.names[name].state](
+                path_lcl + name, path_rmt + name)
+
+        elif file.moved == True:
+            if file.uid in rmt.uids and rmt.uids[file.uid].moved == True:
+                # Both moved to different places
+                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+            else:
+                # Only lcl moved
+                move(path_rmt + old.uids[file.uid].name, path_rmt + name)
+                LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
+                    path_lcl + name, path_rmt + name)
+
+        elif old.names[name].uid in rmt.uids:
+            # Only rmt has moved
+            rmt_name = rmt.uids[old.names[name].uid].name
+
+            move(path_lcl + name, path_lcl + rmt_name)
+            LOGIC[file.state][THESAME](path_lcl + rmt_name, path_rmt + rmt_name)
+
+        else:
+            print(red('WARNING:'), 'fell out of switch in sinc function')
+
+    for name, file in sorted(rmt.names.items()):
+        if file.state == CREATED:
+            new_name = rename(path_rmt, name, lcl)
+            pull(path_lcl + new_name, path_rmt + new_name)
+
 
 ''' ------------ Functions for working with packed dictionary's ------------ '''
 
@@ -302,33 +367,33 @@ def move(source, dest):
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
               ylw(' Move: ') + source + cyn(' to: ') + dest)
-        LOG('Move: ' + source + ' to: ' + dest)
+        LOG('Move: \t' + source + ' to: ' + dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
         print(ylw('Move: ') + source + cyn(' to: ') + dest)
 
 
-def cpyR(source, dest):
+def push(source, dest):
     '''Copy source (at local) to dest (at remote)'''
     global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
-        LOG('Push: ' + source)
+        LOG('Push: \t' + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(cyn("Push: ") + source)
 
 
-def cpyL(dest, source):
+def pull(dest, source):
     '''Copy source (at remote) to dest (at local)'''
     global counter, LOG
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
-        LOG('Pull: ' + source)
+        LOG('Pull: \t' + source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(mgt("Pull: ") + source)
@@ -339,19 +404,19 @@ def null(*args):
 
 
 def conflict(source, dest):
-    '''Duplicate, rename and copy conflicts both ways'''
+    '''Rename and copy conflicts both ways'''
     global LOG
 
     print(red('Conflict: ') + source)
 
     if not dry_run:
-        LOG('Conflict: ' + source)
+        LOG('Cnflct: \t' + source)
 
     move(source, prepend(source, 'lcl_'))
     move(dest, prepend(dest, 'rmt_'))
 
-    cpyR(prepend(source, 'lcl_'), prepend(dest, 'lcl_'))
-    cpyL(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
+    push(prepend(source, 'lcl_'), prepend(dest, 'lcl_'))
+    pull(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
 
 
 def delL(left, right):
@@ -361,92 +426,15 @@ def delL(left, right):
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
-        LOG('Delete: ' + left)
+        LOG('Delete: \t' + left)
         subprocess.run(['rclone', 'delete', left])
     else:
         print(ylw("Delete: ") + left)
 
 
 def delR(left, right):
-    '''Delete left (at remote)'''
-    global counter, LOG
-    counter += 1
-
-    if not dry_run:
-        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + right)
-        LOG('Delete: ' + right)
-        if BACKUP_ON:
-            subprocess.run(['rclone', 'mv', right])
-        else:
-            subprocess.run(['rclone', 'delete', right])
-    else:
-        print(ylw("Delete: ") + right)
-
-
-def r_sinc(lcl, rmt, path_lcl, path_rmt):
-    '''Recovery sync function'''
-    for name, file in lcl.names.items():
-        if name in rmt.names:
-            if file.uid != rmt.names[name].uid:
-                if file.time > rmt.names[name].time:
-                    cpyR(path_lcl + name, path_rmt + name)
-                else:
-                    cpyL(path_lcl + name, path_rmt + name)
-        elif file.uid in rmt.uids:
-            if file.time > rmt.uids[file.uid].time:
-                move(path_rmt + rmt.uids[file.uid].name, path_rmt + name)
-            else:
-                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
-        else:
-            new_name = rename(path_lcl, name, rmt)
-            cpyR(path_lcl + name, path_rmt + name)
-
-    for name, file in rmt.names.items():
-        if name not in lcl.names and file.uid not in lcl.uids:
-            new_name = rename(path_rmt, name, lcl)
-            cpyL(path_lcl + name, path_rmt + name)
-
-
-def sinc(old, lcl, rmt, path_lcl, path_rmt):
-    '''Normal sync function'''
-    if recover:
-        r_sinc(lcl, rmt, path_lcl, path_rmt)
-        return
-
-    for name, file in sorted(lcl.names.items()):
-        if file.state == CREATED:
-            new_name = rename(path_lcl, name, rmt)
-            cpyR(path_lcl + new_name, path_rmt + new_name)
-
-        elif name in rmt.names:
-            # Neither moved or both moved to same place
-            LOGIC[file.state][rmt.names[name].state](
-                path_lcl + name, path_rmt + name)
-
-        elif file.moved == True:
-            if file.uid in rmt.uids and rmt.uids[file.uid].moved == True:
-                # Both moved to different places
-                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
-            else:
-                # Only lcl moved
-                move(path_rmt + old.uids[file.uid].name, path_rmt + name)
-                LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
-                    path_lcl + name, path_rmt + name)
-
-        elif old.names[name].uid in rmt.uids:
-            # Only rmt has moved
-            rmt_name = rmt.uids[old.names[name].uid].name
-
-            move(path_lcl + name, path_lcl + rmt_name)
-            LOGIC[file.state][THESAME](path_lcl + rmt_name, path_rmt + rmt_name)
-
-        else:
-            print(red('WARNING:'), 'fell out of switch in sinc function')
-
-    for name, file in sorted(rmt.names.items()):
-        if file.state == CREATED:
-            new_name = rename(path_rmt, name, lcl)
-            cpyL(path_lcl + new_name, path_rmt + new_name)
+    '''Delete right (at remote)'''
+    delL(right, left)
 
 
 # ****************************************************************************
@@ -490,11 +478,10 @@ swap = str.maketrans("/", '_')
 
 LOG = Log(DRIVE_DIR)
 
-LOGIC = [
-        [null, cpyL, delL, conflict],
-        [cpyR, conflict, cpyR, conflict],
-        [delR, cpyL, null, cpyL],
-        [conflict, conflict, cpyR, conflict], ]
+LOGIC = [[null,      pull,       delL,   conflict],
+         [push,      conflict,   push,   conflict],
+         [delR,      pull,       null,   pull],
+         [conflict,  conflict,   push,   conflict], ]
 
 
 # ****************************************************************************
@@ -535,7 +522,7 @@ recover = args.recovery
 
 # get the master structure
 if not os.path.exists(DRIVE_DIR + 'master.json'):
-    print(ylw('WARN'), '"master.json" missing, this must be your first ever run')
+    print(ylw('WARN'), '"master.json" missing, this must be your first run')
     write('master.json', empty())
 
 master = read(DRIVE_DIR + 'master.json')
@@ -560,8 +547,6 @@ for folder in folders:
     path_rmt = BASE_R + folder + '/'
 
     min_path = get_min(master, path)
-
-    LOG('Syncing: ' + path)
 
     # Determine if first run
     if have(master, path):
@@ -602,10 +587,8 @@ for folder in folders:
 
     if dry_run:
         print('Found:', counter, 'job(s)')
-    elif not recover and counter == 0:
-        print('Found:', counter, 'jobs')
     else:
-        if auto or strtobool[input('Execute? ')]:
+        if auto or counter == 0 or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
 
@@ -617,8 +600,9 @@ for folder in folders:
         # Merge into master and clean up
         spin.start(grn('Saving: ') + qt(min_path))
 
-        merge(master, min_path, pack(lsl(BASE_L + min_path)))
-        write(DRIVE_DIR + 'master.json', master)
+        if recover or counter != 0:
+            merge(master, min_path, pack(lsl(BASE_L + min_path)))
+            write(DRIVE_DIR + 'master.json', master)
 
         if args.clean:
             subprocess.run(["rclone", 'rmdirs', path_rmt])
