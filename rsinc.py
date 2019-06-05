@@ -29,21 +29,23 @@ SOFTWARE.
 # ****************************************************************************
 
 
-# where config and data files will be stored.
-DRIVE_DIR = '/home/conor/two_way/'
-BASE_R = 'onedrive:'               # root path of remote drive including colon.
-BASE_L = '/home/conor/'            # path to local drive to mirror remote drive.
 
-DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # folders to sync when ran with -D flag
+DRIVE_DIR = '/home/conor/rsinc/' # Where config and data files will be stored
+BASE_R = 'onedrive:'             # Root path of remote drive including colon
+BASE_L = '/home/conor/'          # Path to local drive to mirror remote drive
 
-CASE_INSENSATIVE = True  # enables case checking for clouds (onedrive) that do
-# not support upper case letters.
+DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # Folders to sync when ran with -D flag
 
-HASH_ON = True  # use hash and size to detect file changes, slows down code but
-# improves accuracy.
+CASE_INSENSATIVE = True  # Enables case checking for clouds (onedrive) that do
+                         # not support upper case letters
 
-HASH_NAME = 'SHA-1'  # name of hash function, run 'rclone lsjson --hash $path'
-# to get supported hash functions from your cloud provider.
+HASH_ON = True  # Use hash and size to detect file changes, slows down code but
+                # improves accuracy
+
+HASH_NAME = 'SHA-1'  # Name of hash function, run 'rclone lsjson --hash $path'
+                     # to get supported hash functions from your cloud provider
+
+BACKUP_ON = True # Moves deleted files into a backup directory
 
 import argparse
 import halo
@@ -365,7 +367,9 @@ def conflict(source, dest):
     global LOG
 
     print(red('Conflict: ') + source)
-    LOG('Conflict: ' + source)
+
+    if not dry_run:
+        LOG('Conflict: ' + source)
 
     move(source, prepend(source, 'lcl_'))
     move(dest, prepend(dest, 'rmt_'))
