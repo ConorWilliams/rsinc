@@ -14,13 +14,9 @@ DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # Folders to sync when ran with -D flag
 CASE_INSENSATIVE = True  # Enables case checking for clouds (onedrive) that do
                          # not support upper case letters
 
-HASH_ON = True  # Use hash and size to detect file changes, slows down code but
-                # improves accuracy
-
 HASH_NAME = 'SHA-1'  # Name of hash function, run 'rclone lsjson --hash $path'
                      # to get supported hash functions from your cloud provider
 
-BACKUP_ON = True # Moves deleted files into a backup directory
 
 import argparse
 from datetime import datetime
@@ -53,7 +49,8 @@ class File():
 
 
 class Flat():
-    def __init__(self):
+    def __init__(self, path):
+        self.path = path
         self.files = []
         self.uids = {}
         self.names = {}
@@ -78,6 +75,9 @@ class Log(object):
         self.logs.append(datetime.now().strftime('%H:%M:%S ') + log + '\n')
 
     def flush(self):
+        if len(self.logs) == 0:
+            return
+
         day = datetime.now().strftime('%Y-%m-%d')
         log_file = open(self.path + day, "a+")
 
@@ -160,96 +160,90 @@ def write(file, d):
 def lsl(path):
     '''
     Runs rclone lsjson on path and returns a dict containing each file with the
-    size and last modified time as integers
+    uid and last modified time
     '''
-    command = ['rclone', 'lsjson', '-R', '--files-only', path]
-
-    if HASH_ON:
-        command += ['--hash']
+    command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
     result = subprocess.Popen(command, stdout=subprocess.PIPE)
 
     list_of_dicts = json.load(result.stdout)
 
-    out = Flat()
+    out = Flat(path)
     for d in list_of_dicts:
         time = d['ModTime'][:19]
         time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
-        if HASH_ON:
-            hashsize = str(d['Size'])
-            hashsize += d['Hashes'][HASH_NAME]
-        else:
-            hashsize = d['Size']
+        hashsize = str(d['Size'])
+        hashsize += d['Hashes'][HASH_NAME]
 
         out.update(d['Path'], hashsize, time)
 
     return out
 
-def r_sinc(lcl, rmt, path_lcl, path_rmt):
+def r_sinc(lcl, rmt):
     '''Recovery sync function'''
     for name, file in lcl.names.items():
         if name in rmt.names:
             if file.uid != rmt.names[name].uid:
                 if file.time > rmt.names[name].time:
-                    push(path_lcl + name, path_rmt + name)
+                    push(lcl.path + name, rmt.path + name)
                 else:
-                    pull(path_lcl + name, path_rmt + name)
+                    pull(lcl.path + name, rmt.path + name)
         elif file.uid in rmt.uids:
             if file.time > rmt.uids[file.uid].time:
-                move(path_rmt + rmt.uids[file.uid].name, path_rmt + name)
+                move(rmt.path + rmt.uids[file.uid].name, rmt.path + name)
             else:
-                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+                move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
         else:
-            new_name = rename(path_lcl, name, rmt)
-            push(path_lcl + name, path_rmt + name)
+            new_name = rename(lcl.path, name, rmt)
+            push(lcl.path + name, rmt.path + name)
 
     for name, file in rmt.names.items():
         if name not in lcl.names and file.uid not in lcl.uids:
-            new_name = rename(path_rmt, name, lcl)
-            pull(path_lcl + name, path_rmt + name)
+            new_name = rename(rmt.path, name, lcl)
+            pull(lcl.path + name, rmt.path + name)
 
 
-def sinc(old, lcl, rmt, path_lcl, path_rmt):
+def sinc(old, lcl, rmt):
     '''Normal sync function'''
     if recover:
-        r_sinc(lcl, rmt, path_lcl, path_rmt)
+        r_sinc(lcl, rmt)
         return
 
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
-            new_name = rename(path_lcl, name, rmt)
-            push(path_lcl + new_name, path_rmt + new_name)
+            new_name = rename(lcl.path, name, rmt)
+            push(lcl.path + new_name, rmt.path + new_name)
 
         elif name in rmt.names:
             # Neither moved or both moved to same place
             LOGIC[file.state][rmt.names[name].state](
-                path_lcl + name, path_rmt + name)
+                lcl.path + name, rmt.path + name)
 
         elif file.moved == True:
             if file.uid in rmt.uids and rmt.uids[file.uid].moved == True:
                 # Both moved to different places
-                move(path_lcl + name, path_lcl + rmt.uids[file.uid].name)
+                move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
             else:
                 # Only lcl moved
-                move(path_rmt + old.uids[file.uid].name, path_rmt + name)
+                move(rmt.path + old.uids[file.uid].name, rmt.path + name)
                 LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
-                    path_lcl + name, path_rmt + name)
+                    lcl.path + name, rmt.path + name)
 
         elif old.names[name].uid in rmt.uids:
             # Only rmt has moved
             rmt_name = rmt.uids[old.names[name].uid].name
 
-            move(path_lcl + name, path_lcl + rmt_name)
-            LOGIC[file.state][THESAME](path_lcl + rmt_name, path_rmt + rmt_name)
+            move(lcl.path + name, lcl.path + rmt_name)
+            LOGIC[file.state][THESAME](lcl.path + rmt_name, rmt.path + rmt_name)
 
         else:
             print(red('WARNING:'), 'fell out of switch in sinc function')
 
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
-            new_name = rename(path_rmt, name, lcl)
-            pull(path_lcl + new_name, path_rmt + new_name)
+            new_name = rename(rmt.path, name, lcl)
+            pull(lcl.path + new_name, rmt.path + new_name)
 
 
 ''' ------------ Functions for working with packed dictionary's ------------ '''
@@ -462,7 +456,7 @@ else:
         cwd = ['/'.join(cwd)]
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
-             1: 'yes', 0: 'no', 't': True, 'true': True, 'f': False,
+             '1': True, "0": False, 't': True, 'true': True, 'f': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
 
@@ -515,6 +509,7 @@ dry_run = args.dry
 auto = args.auto
 recover = args.recovery
 
+
 # ****************************************************************************
 # *                               Main Program                               *
 # ****************************************************************************
@@ -538,28 +533,24 @@ if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
 
 for folder in folders:
     print('')
-    old = Flat()
-    lcl = Flat()
-    rmt = Flat()
-
-    path = folder
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
-    min_path = get_min(master, path)
+    min_path = get_min(master, folder)
 
     # Determine if first run
-    if have(master, path):
-        print(grn('Have:'), qt(path) + ', entering sync & merge mode')
+    if have(master, folder):
+        print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
     else:
-        print(ylw('Don\'t have:'), qt(path) + ', entering first_sync mode')
+        print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
         recover = True
 
     # Scan directories
-    spin.start(("Crawling: ") + qt(path))
+    spin.start(("Crawling: ") + qt(folder))
 
     lcl = lsl(path_lcl)
     rmt = lsl(path_rmt)
+    old = Flat('null')
 
     spin.stop_and_persist(symbol='✔')
 
@@ -568,8 +559,7 @@ for folder in folders:
         print('Running', ylw('recover/first_sync'), 'mode')
     else:
         print('Reading last state.')
-
-        branch = get_branch(master, path)
+        branch = get_branch(master, folder)
         unpack(branch, old)
 
         calc_states(old, lcl)
@@ -580,7 +570,7 @@ for folder in folders:
     counter = 0
 
     print(grn('Dry pass:'))
-    sinc(old, lcl, rmt, path_lcl, path_rmt)
+    sinc(old, lcl, rmt)
 
     dry_run = args.dry
     total_jobs = counter
@@ -591,11 +581,9 @@ for folder in folders:
         if auto or counter == 0 or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
-
-            if not os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
-                write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
-
-            sinc(old, lcl, rmt, path_lcl, path_rmt)
+            
+            write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
+            sinc(old, lcl, rmt)
 
         # Merge into master and clean up
         spin.start(grn('Saving: ') + qt(min_path))
