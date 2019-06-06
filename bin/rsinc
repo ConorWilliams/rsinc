@@ -7,9 +7,9 @@
 # ****************************************************************************
 
 
-DRIVE_DIR = '/home/conor/rsinc/'  # Where config and data files will be stored
-BASE_R = 'onedrive:'             # Root path of remote drive including colon
-BASE_L = '/home/conor/'          # Path to local drive to mirror remote drive
+DRIVE_DIR = '~/.rsinc/' # Where config and data files will be stored
+BASE_R = 'onedrive:'    # Root path of remote drive including colon
+BASE_L = '/home/conor/' # Path to local drive to mirror remote drive
 
 DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # Folders to sync when ran with -D flag
 
@@ -429,21 +429,6 @@ print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
 
-CWD = os.getcwd()
-cwd = CWD.split('/')
-
-for elem in BASE_L.split('/')[:-1]:
-    if cwd[0] == elem:
-        cwd.pop(0)
-    else:
-        cwd = DEFAULT_DIRS
-        break
-else:
-    if len(cwd) == 0:
-        cwd = DEFAULT_DIRS
-    else:
-        cwd = ['/'.join(cwd)]
-
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
@@ -461,6 +446,22 @@ LOGIC = [[null,      pull,       delL,   conflict],
          [push,      conflict,   push,   conflict],
          [delR,      pull,       null,   pull],
          [conflict,  conflict,   push,   conflict], ]
+
+# Decide which folder(s) to sync
+CWD = os.getcwd()
+cwd = CWD.split('/')
+
+for elem in BASE_L.split('/')[:-1]:
+    if cwd[0] == elem:
+        cwd.pop(0)
+    else:
+        cwd = DEFAULT_DIRS
+        break
+else:
+    if len(cwd) == 0:
+        cwd = DEFAULT_DIRS
+    else:
+        cwd = ['/'.join(cwd)]
 
 #Set up logging
 if not os.path.exists(DRIVE_DIR + 'logs/'):
