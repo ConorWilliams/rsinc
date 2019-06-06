@@ -33,7 +33,8 @@ DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 defult_config = {'BASE_R': 'onedrive:',
                  'BASE_L': '/home/conor/',
                  'CASE_INSENSATIVE': True,
-                 'HASH_NAME': 'SHA-1', }
+                 'HASH_NAME': 'SHA-1',
+                 "DEFAULT_DIRS": ["cpp", "docs", "cam"], }
 
 if not os.path.exists(DRIVE_DIR):
     subprocess.run(['mkdir', DRIVE_DIR])

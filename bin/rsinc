@@ -424,6 +424,8 @@ BASE_R = config['BASE_R']
 BASE_L = config['BASE_L']
 CASE_INSENSATIVE = config['CASE_INSENSATIVE']
 HASH_NAME = config['HASH_NAME']
+DEFAULT_DIRS = config['DEFAULT_DIRS']
+
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
