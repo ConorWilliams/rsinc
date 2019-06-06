@@ -18,9 +18,9 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 Install [rclone](https://github.com/ncw/rclone) and [configure](https://rclone.org/docs/) as appropriate for your cloud service.
 
 Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc` 
-Open the config file, `~/.rsinc/config.json`, It should look something like something like this:
-```json
-{
+
+Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like something like this:
+```json {
     "BASE_L": "/home/conor/",
     "BASE_R": "onedrive:",
     "CASE_INSENSATIVE": true,
@@ -30,8 +30,9 @@ Open the config file, `~/.rsinc/config.json`, It should look something like some
         "cam"
     ],
     "HASH_NAME": "SHA-1"
-}
-```
+}```
+
+`BASE_L` is the absolute path to the local 'root' that your remote will be synced to. `BASE_R` is the name of your rclone remote. `CASE_INSENSATIVE` 
 
 
 ## Using
