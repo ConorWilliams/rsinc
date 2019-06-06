@@ -17,12 +17,22 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 Install [rclone](https://github.com/ncw/rclone) and [configure](https://rclone.org/docs/) as appropriate for your cloud service.
 
-Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc`, then open the config file: `~/.rsinc/config.json`. It should look something like something like this:
-```python
-if (isAwesome){
-  return true
+Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc` 
+Open the config file, `~/.rsinc/config.json`, It should look something like something like this:
+```json
+{
+    "BASE_L": "/home/conor/",
+    "BASE_R": "onedrive:",
+    "CASE_INSENSATIVE": true,
+    "DEFAULT_DIRS": [
+        "cpp",
+        "docs",
+        "cam"
+    ],
+    "HASH_NAME": "SHA-1"
 }
 ```
+
 
 ## Using
 
