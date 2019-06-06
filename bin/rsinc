@@ -543,7 +543,7 @@ if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
 
 for folder in folders:
     print('')
-    save = args.save
+    save = False
 
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
