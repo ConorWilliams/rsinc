@@ -14,11 +14,12 @@ setuptools.setup(
     version="1.0",
     author="ConorWilliams",
     author_email="conorwilliams@outlook.com",
-    description="A tiny, hackable, two-way cloud synchronisation client for rclone",
+    description="A tiny, hackable, two-way cloud synchronisation client for Linux",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ConorWilliams/rsinc",
     packages=setuptools.find_packages(),
+    install_requires=[ujson, clint, halo],
     scripts=['bin/rsinc'],
     python_requires='>=3',
     classifiers=[
@@ -32,7 +33,7 @@ DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
 DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 
 defult_config = {'BASE_R': 'onedrive:',
-                 'BASE_L': '/home/conor/',
+                 'BASE_L': os.path.expanduser('~/') + '/',
                  'CASE_INSENSATIVE': True,
                  'HASH_NAME': 'SHA-1',
                  "DEFAULT_DIRS": ["cpp", "docs", "cam"], }
