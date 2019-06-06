@@ -5,8 +5,8 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 ## Features
 
 * Robust two-way syncing 
-* Tracks moved files
-* Partial/selective syncing for improved speed
+* Tracks file moves
+* **Partial/selective** syncing for improved speed
 * Recovery mode
 * Dry-run mode 
 * Crash detection and recovery
@@ -17,9 +17,16 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 Install [rclone](https://github.com/ncw/rclone) and [configure](https://rclone.org/docs/) as appropriate for your cloud service.
 
-To install rsinc run `pip3 install git+https://github.com/ConorWilliams/rsinc/blob/master/bin/rsinc`
+Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc`, then open the config file: `~/.rsinc/config.json`. It should look something like something like this:
+```python
+if (isAwesome){
+  return true
+}
+```
 
 ## Using
+
+about logs
 
 ## Details
 
