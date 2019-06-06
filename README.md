@@ -30,7 +30,8 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
         "cam"
     ],
     "HASH_NAME": "SHA-1"
-}```
+}
+```
 
 `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. `BASE_R` is the name of your rclone remote. `CASE_INSENSATIVE` 
 
