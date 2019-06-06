@@ -424,6 +424,7 @@ def delR(left, right):
 # *                           Definitions / Set-up                           *
 # ****************************************************************************
 
+DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 
 print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
@@ -447,10 +448,12 @@ LOGIC = [[null,      pull,       delL,   conflict],
          [delR,      pull,       null,   pull],
          [conflict,  conflict,   push,   conflict], ]
 
+if not os.path.exists(DRIVE_DIR):
+    subprocess.run(['mkdir', DRIVE_DIR])
+
 # Decide which folder(s) to sync
 CWD = os.getcwd()
 cwd = CWD.split('/')
-
 for elem in BASE_L.split('/')[:-1]:
     if cwd[0] == elem:
         cwd.pop(0)
@@ -468,7 +471,6 @@ if not os.path.exists(DRIVE_DIR + 'logs/'):
     subprocess.run(['mkdir', DRIVE_DIR + 'logs/'])
 
 log_file = DRIVE_DIR + 'logs/' + datetime.now().strftime('%Y-%m-%d')
-
 logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S', 
                     format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -513,7 +515,7 @@ recover = args.recovery
 # get the master structure
 if not os.path.exists(DRIVE_DIR + 'master.json'):
     print(ylw('WARN'), '"master.json" missing, this must be your first run')
-    write('master.json', empty())
+    write(DRIVE_DIR + 'master.json', empty())
 
 master = read(DRIVE_DIR + 'master.json')
 
