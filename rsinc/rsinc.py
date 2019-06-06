@@ -1,4 +1,6 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+
+# -*- coding: utf-8 -*-
 
 # ****************************************************************************
 # *                                 Settings                                 *
@@ -116,6 +118,7 @@ def rename(path, name, flat):
         new_name = prepend(new_name, '_')
 
     if new_name != name:
+        logging.warn('Case mismatch: %s', name)
         move(path + name, path + new_name)
 
     return new_name
@@ -466,7 +469,8 @@ if not os.path.exists(DRIVE_DIR + 'logs/'):
 log_file = DRIVE_DIR + 'logs/' + datetime.now().strftime('%Y-%m-%d')
 
 logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S', 
-                    format='%(asctime)s-%(levelname)s-%(message)s')
+                    format='%(asctime)s %(levelname)s: %(message)s')
+
 
 # ****************************************************************************
 # *                             Parsing Arguments                            *
