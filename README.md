@@ -54,7 +54,7 @@ The optional arguments available are:
 *  -d, --dry, do a dry run, no changes are made at all.
 *  -c, --clean, remove any empty directories in local and remote.
 *  -D, --default, sync default folders, specified in `~/.rsinc/config.json`.
-*  -r, --recovery, force recovery mode.
+*  -r, --recover-y, force recovery mode.
 *  -a, --auto, automatically applies changes without requesting permission.
 *  -p, --purge, deletes the `~/.rsinc/master.json` file resulting in a total reset of tracking.
 
@@ -66,8 +66,8 @@ Rsinc determines, for each file in local and remote, whether they have been upda
 
 Files tagged as created are copied to their complimentary locations. Next moves are mirrored giving preference to remote in the event of a move conflict. Rsinc checks the copies and moves do not produce a name conflict and renames first if necessary. Finally the moved and unmoved files are modified according according to:
 
-x | rmt unchanged | rmt updated | rmt deleted | rmt created
------------------------------------------------------------
+state | rmt unchanged | rmt updated | rmt deleted | rmt created
+----- | ------------- | ----------- | ----------- |  ----------
 lcl unchanged   | do nothing    | pull rmt  | delete lcl    | conflict
 lcl updated     | push lcl      | conflict  | push lcl      | conflict
 lcl deleted     | delete rmt    | pull      | do nothing    | pull rmt
