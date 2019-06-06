@@ -5,7 +5,7 @@
 # ****************************************************************************
 
 
-DRIVE_DIR = '/home/conor/rsinc/' # Where config and data files will be stored
+DRIVE_DIR = '/home/conor/rsinc/'  # Where config and data files will be stored
 BASE_R = 'onedrive:'             # Root path of remote drive including colon
 BASE_L = '/home/conor/'          # Path to local drive to mirror remote drive
 
@@ -19,11 +19,11 @@ HASH_NAME = 'SHA-1'  # Name of hash function, run 'rclone lsjson --hash $path'
 
 
 import argparse
-from datetime import datetime
 import os
 import subprocess
 import time
 import ujson as json
+from datetime import datetime
 
 import halo
 from clint.textui import colored
@@ -46,6 +46,7 @@ class File():
         self.time = time
         self.state = state
         self.moved = False
+        self.clone = False
 
 
 class Flat():
@@ -58,9 +59,14 @@ class Flat():
 
     def update(self, name, uid, time, state=THESAME):
         self.files.append(File(name, uid, time, state))
-        self.uids.update({uid: self.files[-1]})
         self.names.update({name: self.files[-1]})
         self.lower.add(name.lower())
+
+        if uid in self.uids:
+            self.names[name].clone = True
+            self.uids[uid].clone = True
+        else:
+            self.uids.update({uid: self.files[-1]})
 
 
 class Log(object):
@@ -94,7 +100,7 @@ class Log(object):
 
 def calc_states(old, new):
     '''
-    Calculates if files on one side have been updated, moved, deleted, 
+    Calculates if files on one side have been updated, moved, deleted,
     created or stayed the same. Arguments are both Flats.
     '''
     for name, file in new.names.items():
@@ -103,7 +109,7 @@ def calc_states(old, new):
                 file.state = UPDATED
             else:
                 file.state = THESAME
-        elif file.uid in old.uids:
+        elif file.uid in old.uids and file.clone == False:
             file.moved = True
             file.state = THESAME
         else:
@@ -123,7 +129,7 @@ def prepend(name, prefix):
 
 def rename(path, name, flat):
     '''
-    Renames file to be transferred (if case-conflict occurs on other side) and 
+    Renames file to be transferred (if case-conflict occurs on other side) and
     returns the new name
     '''
     new_name = name
@@ -180,6 +186,7 @@ def lsl(path):
 
     return out
 
+
 def r_sinc(lcl, rmt):
     '''Recovery sync function'''
     for name, file in lcl.names.items():
@@ -189,7 +196,9 @@ def r_sinc(lcl, rmt):
                     push(lcl.path + name, rmt.path + name)
                 else:
                     pull(lcl.path + name, rmt.path + name)
-        elif file.uid in rmt.uids:
+
+        elif file.uid in rmt.uids and not file.clone \
+                                  and not rmt.uids[uid].clone:
             if file.time > rmt.uids[file.uid].time:
                 move(rmt.path + rmt.uids[file.uid].name, rmt.path + name)
             else:
@@ -199,7 +208,7 @@ def r_sinc(lcl, rmt):
             push(lcl.path + name, rmt.path + name)
 
     for name, file in rmt.names.items():
-        if name not in lcl.names and file.uid not in lcl.uids:
+        if name not in lcl.names and (file.uid not in lcl.uids or file.clone):
             new_name = rename(rmt.path, name, lcl)
             pull(lcl.path + name, rmt.path + name)
 
@@ -460,11 +469,11 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
 
-ylw = colored.yellow   # delete
+ylw = colored.yellow   # delete/move
 cyn = colored.cyan     # push
 mgt = colored.magenta  # pull
 red = colored.red      # error/conflict
-grn = colored.green    # normal info
+grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
@@ -578,27 +587,28 @@ for folder in folders:
     if dry_run:
         print('Found:', counter, 'job(s)')
     else:
-        if auto or counter == 0 or strtobool[input('Execute? ')]:
+        if counter == 0:
+            print('Found:', counter, 'jobs')
+        elif auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
             
             write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
             sinc(old, lcl, rmt)
 
-        # Merge into master and clean up
-        spin.start(grn('Saving: ') + qt(min_path))
+            # Merge into master and clean up
+            spin.start(grn('Saving: ') + qt(min_path))
 
-        if recover or counter != 0:
             merge(master, min_path, pack(lsl(BASE_L + min_path)))
             write(DRIVE_DIR + 'master.json', master)
 
+            LOG.flush()
+
+            spin.stop_and_persist(symbol='✔')
+
         if args.clean:
-            subprocess.run(["rclone", 'rmdirs', path_rmt])
-            subprocess.run(["rclone", 'rmdirs', path_lcl])
-
-        LOG.flush()
-
-        spin.stop_and_persist(symbol='✔')
+                subprocess.run(["rclone", 'rmdirs', path_rmt])
+                subprocess.run(["rclone", 'rmdirs', path_lcl])
 
     if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
         subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
