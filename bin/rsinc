@@ -32,14 +32,13 @@ CREATED = 3
 
 
 class File():
-    def __init__(self, name, uid, time, state=THESAME):
+    def __init__(self, name, uid, time, state):
         self.name = name
         self.uid = uid
         self.time = time
         self.state = state
         self.moved = False
         self.clone = False
-        self.name_clone = False
 
 
 class Flat():
@@ -48,17 +47,12 @@ class Flat():
         self.files = []
         self.uids = {}
         self.names = {}
-        self.lower = {}
+        self.lower = set({})
 
     def update(self, name, uid, time, state=THESAME):
         self.files.append(File(name, uid, time, state))
         self.names.update({name: self.files[-1]})
-
-        if name.lower() in self.lower:
-            self.lower[name.lower].name_clone = True
-            self.names[name].name_clone = True
-        else:
-            self.lower.update({name.lower(): self.files[-1]})
+        self.lower.add(name.lower())
 
         if uid in self.uids:
             self.names[name].clone = True
@@ -101,16 +95,20 @@ def prepend(name, prefix):
     return new_name
 
 
-def rename(path, name, flat):
+def rename(path, name, flats):
     '''
     Renames file to be transferred (if case-conflict occurs on other side) and
     returns the new name
     '''
+    if not CASE_INSENSATIVE:
+        return name
+
     new_name = name
 
-    while CASE_INSENSATIVE and new_name.lower() in flat.lower:
-        print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
-        new_name = prepend(new_name, '_')
+    for flat in flats:
+        while new_name.lower() in flat.lower:
+            print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
+            new_name = prepend(new_name, '_')
 
     if new_name != name:
         logging.warn('Case mismatch: %s', name)
@@ -164,6 +162,7 @@ def lsl(path):
 
 def r_sync(lcl, rmt):
     '''Recovery sync function'''
+    pushed = Flat('null')
     for name, file in lcl.names.items():
         if name in rmt.names:
             if file.uid != rmt.names[name].uid:
@@ -178,15 +177,16 @@ def r_sync(lcl, rmt):
             else:
                 move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
         else:
-            new_name = rename(lcl.path, name, rmt)
+            name = rename(lcl.path, name, [rmt, pushed])
             push(lcl.path + name, rmt.path + name)
-            rmt.update(new_name, 'NOT_' + file.uid, file.time)
+            pushed.update(name, file.uid, file.time)
 
+    pulled = Flat('null')
     for name, file in rmt.names.items():
         if name not in lcl.names and (file.uid not in lcl.uids or file.clone):
-            new_name = rename(rmt.path, name, lcl)
+            name = rename(rmt.path, name, [lcl, pulled])
             pull(lcl.path + name, rmt.path + name)
-            lcl.update(new_name, 'NOT_' + file.uid, file.time)
+            pulled.update(name, file.uid, file.time)
 
 
 def sync(old, lcl, rmt):
@@ -195,11 +195,12 @@ def sync(old, lcl, rmt):
         r_sync(lcl, rmt)
         return
 
+    pushed = Flat('null')
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
-            new_name = rename(lcl.path, name, rmt)
-            push(lcl.path + new_name, rmt.path + new_name)
-            rmt.update(new_name, file.uid, file.time)
+            name = rename(lcl.path, name, [rmt, pushed])
+            push(lcl.path + name, rmt.path + name)
+            pushed.update(name, file.uid, file.time)
 
         elif name in rmt.names:
             # Neither moved or both moved to same place
@@ -227,11 +228,12 @@ def sync(old, lcl, rmt):
             print(red('WARNING:'), 'fell off switch in sync function')
             logging.warning('Fell off switch in sync function with: %s', name)
 
+    pulled = Flat('null')
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
-            new_name = rename(rmt.path, name, lcl)
-            pull(lcl.path + new_name, rmt.path + new_name)
-            lcl.update(new_name, file.uid, file.time)
+            name = rename(rmt.path, name, [lcl, pulled])
+            pull(lcl.path + name, rmt.path + name)
+            pulled.update(name, file.uid, file.time)
 
 
 ''' ------------ Functions for working with packed dictionary's ------------ '''
