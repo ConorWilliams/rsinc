@@ -23,6 +23,7 @@ import os
 import subprocess
 import time
 import ujson as json
+import logging
 from datetime import datetime
 
 import halo
@@ -67,30 +68,6 @@ class Flat():
             self.uids[uid].clone = True
         else:
             self.uids.update({uid: self.files[-1]})
-
-
-class Log(object):
-    def __init__(self, path):
-        self.path = path + "logs/"
-        self.logs = []
-
-        if not os.path.exists(self.path):
-            subprocess.run(['mkdir', self.path])
-
-    def __call__(self, log):
-        self.logs.append(datetime.now().strftime('%H:%M:%S ') + log + '\n')
-
-    def flush(self):
-        if len(self.logs) == 0:
-            return
-
-        day = datetime.now().strftime('%Y-%m-%d')
-        log_file = open(self.path + day, "a+")
-
-        for log in self.logs:
-            log_file.write(log)
-
-        log_file.close()
 
 
 # ****************************************************************************
@@ -187,7 +164,7 @@ def lsl(path):
     return out
 
 
-def r_sinc(lcl, rmt):
+def r_sync(lcl, rmt):
     '''Recovery sync function'''
     for name, file in lcl.names.items():
         if name in rmt.names:
@@ -213,10 +190,10 @@ def r_sinc(lcl, rmt):
             pull(lcl.path + name, rmt.path + name)
 
 
-def sinc(old, lcl, rmt):
+def sync(old, lcl, rmt):
     '''Normal sync function'''
     if recover:
-        r_sinc(lcl, rmt)
+        r_sync(lcl, rmt)
         return
 
     for name, file in sorted(lcl.names.items()):
@@ -247,7 +224,8 @@ def sinc(old, lcl, rmt):
             LOGIC[file.state][THESAME](lcl.path + rmt_name, rmt.path + rmt_name)
 
         else:
-            print(red('WARNING:'), 'fell out of switch in sinc function')
+            print(red('WARNING:'), 'fell off switch in sync function')
+            logging.warning('Fell off switch in sync function with: %s', name)
 
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
@@ -364,13 +342,13 @@ def get_min(master, path):
 
 def move(source, dest):
     '''Move source to dest'''
-    global counter, LOG
+    global counter
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
               ylw(' Move: ') + source + cyn(' to: ') + dest)
-        LOG('Move: \t' + source + ' to: ' + dest)
+        logging.info('MOVE: %s TO %s', source, dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
         print(ylw('Move: ') + source + cyn(' to: ') + dest)
@@ -383,7 +361,7 @@ def push(source, dest):
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
-        LOG('Push: \t' + source)
+        logging.info('PUSH: %s', source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(cyn("Push: ") + source)
@@ -396,7 +374,7 @@ def pull(dest, source):
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
-        LOG('Pull: \t' + source)
+        logging.info('PULL: %s', source)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
         print(mgt("Pull: ") + source)
@@ -408,12 +386,11 @@ def null(*args):
 
 def conflict(source, dest):
     '''Rename and copy conflicts both ways'''
-    global LOG
 
     print(red('Conflict: ') + source)
 
     if not dry_run:
-        LOG('Cnflct: \t' + source)
+        logging.warning('CONFLICT: %s', source)
 
     move(source, prepend(source, 'lcl_'))
     move(dest, prepend(dest, 'rmt_'))
@@ -424,12 +401,12 @@ def conflict(source, dest):
 
 def delL(left, right):
     '''Delete left (at local)'''
-    global counter, LOG
+    global counter
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
-        LOG('Del: \t' + left)
+        logging.info('DELETE: %s', left)
         subprocess.run(['rclone', 'delete', left])
     else:
         print(ylw("Delete: ") + left)
@@ -477,15 +454,19 @@ grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
-swap = str.maketrans("/", '_')
-
-LOG = Log(DRIVE_DIR)
-
 LOGIC = [[null,      pull,       delL,   conflict],
          [push,      conflict,   push,   conflict],
          [delR,      pull,       null,   pull],
          [conflict,  conflict,   push,   conflict], ]
 
+#Set up logging
+if not os.path.exists(DRIVE_DIR + 'logs/'):
+    subprocess.run(['mkdir', DRIVE_DIR + 'logs/'])
+
+log_file = DRIVE_DIR + 'logs/' + datetime.now().strftime('%Y-%m-%d')
+
+logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S', 
+                    format='%(asctime)s-%(levelname)s-%(message)s')
 
 # ****************************************************************************
 # *                             Parsing Arguments                            *
@@ -533,12 +514,14 @@ master = read(DRIVE_DIR + 'master.json')
 
 if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
     print(red('ERROR') + ', detected a crash, found rsinc.tmp')
+
     corrupt = read(DRIVE_DIR + 'rsinc.tmp')['folder']
     if corrupt in folders:
         folders.remove(corrupt)
 
     folders.insert(0, corrupt)
     recover = True
+    logging.warning('Detected crash, recovering %s', corrupt)
 
 for folder in folders:
     print('')
@@ -579,7 +562,7 @@ for folder in folders:
     counter = 0
 
     print(grn('Dry pass:'))
-    sinc(old, lcl, rmt)
+    sync(old, lcl, rmt)
 
     dry_run = args.dry
     total_jobs = counter
@@ -588,13 +571,13 @@ for folder in folders:
         print('Found:', counter, 'job(s)')
     else:
         if counter == 0:
-            print('Found:', counter, 'jobs')
+            print('Found no jobs')
         elif auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
             
             write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
-            sinc(old, lcl, rmt)
+            sync(old, lcl, rmt)
 
             # Merge into master and clean up
             spin.start(grn('Saving: ') + qt(min_path))
@@ -602,7 +585,7 @@ for folder in folders:
             merge(master, min_path, pack(lsl(BASE_L + min_path)))
             write(DRIVE_DIR + 'master.json', master)
 
-            LOG.flush()
+            subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
 
             spin.stop_and_persist(symbol='✔')
 
@@ -612,10 +595,7 @@ for folder in folders:
             subprocess.run(["rclone", 'rmdirs', path_rmt])
             subprocess.run(["rclone", 'rmdirs', path_lcl])
 
-            spin.stop_and_persist(symbol='✔')
-
-    if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
-        subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
+            spin.stop_and_persist(symbol='✔')        
 
     recover = args.recovery
 
