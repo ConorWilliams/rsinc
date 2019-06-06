@@ -20,7 +20,7 @@ setuptools.setup(
     url="https://github.com/ConorWilliams/rsinc",
     packages=setuptools.find_packages(),
     scripts=['bin/rsinc'],
-    install_requires=['halo', 'clint'],
+    python_requires='>=3',
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "License :: OSI Approved :: MIT License",
