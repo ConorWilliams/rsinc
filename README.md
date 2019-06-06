@@ -6,7 +6,7 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 * Robust two-way syncing 
 * Tracks file moves
-* **Partial/selective** syncing for improved speed
+* **Selective** syncing for improved speed
 * Recovery mode
 * Dry-run mode 
 * Crash detection and recovery
@@ -50,20 +50,22 @@ If it is not the first run on a path rsinc will perform a traditional two-way sy
 
 The optional arguments available are:
 
-*  -h, --help      Show help message and exit.
-*  -d, --dry       Do a dry run, no changes are made at all.
-*  -c, --clean     Remove any empty directories in local and remote.
-*  -D, --default   Sync default folders, specified in `~/.rsinc/config.json`.
-*  -r, --recovery  Force recovery mode.
-*  -a, --auto      Automatically applies changes without requesting permission.
-*  -p, --purge     Deletes the `~/.rsinc/master.json` file resulting in a total reset of tracking.
-
-
-
-
-about logs
+*  -h, --help, show help message and exit.
+*  -d, --dry, do a dry run, no changes are made at all.
+*  -c, --clean, remove any empty directories in local and remote.
+*  -D, --default, sync default folders, specified in `~/.rsinc/config.json`.
+*  -r, --recovery, force recovery mode.
+*  -a, --auto, automatically applies changes without requesting permission.
+*  -p, --purge, deletes the `~/.rsinc/master.json` file resulting in a total reset of tracking.
 
 ## Details
 
+### Two-Way Syncing
 
+### Recovery Mode
 
+### Selective Syncing
+
+### Logging
+
+As well as printing to the terminal everything rsinc does, detailed logs are kept at `~/.rsinc/logs/` of all the actions rsinc performs.
