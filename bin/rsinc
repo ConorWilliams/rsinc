@@ -39,6 +39,7 @@ class File():
         self.state = state
         self.moved = False
         self.clone = False
+        self.name_clone = False
 
 
 class Flat():
@@ -47,12 +48,17 @@ class Flat():
         self.files = []
         self.uids = {}
         self.names = {}
-        self.lower = set()
+        self.lower = {}
 
     def update(self, name, uid, time, state=THESAME):
         self.files.append(File(name, uid, time, state))
         self.names.update({name: self.files[-1]})
-        self.lower.add(name.lower())
+
+        if name.lower() in self.lower:
+            self.lower[name.lower].name_clone = True
+            self.names[name].name_clone = True
+        else:
+            self.lower.update({name.lower(): self.files[-1]})
 
         if uid in self.uids:
             self.names[name].clone = True
@@ -166,8 +172,7 @@ def r_sync(lcl, rmt):
                 else:
                     pull(lcl.path + name, rmt.path + name)
 
-        elif file.uid in rmt.uids and not file.clone \
-                and not rmt.uids[uid].clone:
+        elif file.uid in rmt.uids and not file.clone and not rmt.uids[uid].clone:
             if file.time > rmt.uids[file.uid].time:
                 move(rmt.path + rmt.uids[file.uid].name, rmt.path + name)
             else:
@@ -175,11 +180,13 @@ def r_sync(lcl, rmt):
         else:
             new_name = rename(lcl.path, name, rmt)
             push(lcl.path + name, rmt.path + name)
+            rmt.update(new_name, 'NOT_' + file.uid, file.time)
 
     for name, file in rmt.names.items():
         if name not in lcl.names and (file.uid not in lcl.uids or file.clone):
             new_name = rename(rmt.path, name, lcl)
             pull(lcl.path + name, rmt.path + name)
+            lcl.update(new_name, 'NOT_' + file.uid, file.time)
 
 
 def sync(old, lcl, rmt):
@@ -192,6 +199,7 @@ def sync(old, lcl, rmt):
         if file.state == CREATED:
             new_name = rename(lcl.path, name, rmt)
             push(lcl.path + new_name, rmt.path + new_name)
+            rmt.update(new_name, file.uid, file.time)
 
         elif name in rmt.names:
             # Neither moved or both moved to same place
@@ -223,6 +231,7 @@ def sync(old, lcl, rmt):
         if file.state == CREATED:
             new_name = rename(rmt.path, name, lcl)
             pull(lcl.path + new_name, rmt.path + new_name)
+            lcl.update(new_name, file.uid, file.time)
 
 
 ''' ------------ Functions for working with packed dictionary's ------------ '''
