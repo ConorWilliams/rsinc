@@ -10,7 +10,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="rsinc",
-    version="0.0.1",
+    version="1.0",
     author="ConorWilliams",
     author_email="conorwilliams@outlook.com",
     description="A tiny, hackable, two-way cloud synchronisation client for rclone",
@@ -21,7 +21,7 @@ setuptools.setup(
     scripts=['bin/rsinc'],
     install_requires=['halo', 'clint'],
     classifiers=[
-        "Programming Language :: Python :: 3 ",
+        "Programming Language :: Python :: 3 :: Only",
         "License :: OSI Approved :: MIT License",
         "Operating System :: Unix",
     ],
