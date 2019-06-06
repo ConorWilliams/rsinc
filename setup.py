@@ -19,7 +19,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/ConorWilliams/rsinc",
     packages=setuptools.find_packages(),
-    install_requires=[ujson, clint, halo],
+    install_requires=['ujson', 'clint', 'halo'],
     scripts=['bin/rsinc'],
     python_requires='>=3',
     classifiers=[
