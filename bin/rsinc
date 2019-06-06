@@ -298,22 +298,22 @@ def conflict(source, dest):
     pull(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
 
 
-def delL(left, right):
-    '''Delete left (at local)'''
+def delL(local, remote):
+    '''Delete local (at local)'''
     global counter
     counter += 1
 
     if not dry_run:
-        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
-        logging.info('DELETE: %s', left)
-        subprocess.run(['rclone', 'delete', left])
+        print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + local)
+        logging.info('DELETE: %s', local)
+        subprocess.run(['rclone', 'delete', local])
     else:
-        print(ylw("Delete: ") + left)
+        print(ylw("Delete: ") + local)
 
 
-def delR(left, right):
-    '''Delete right (at remote)'''
-    delL(right, left)
+def delR(local, remote):
+    '''Delete remote (at remote)'''
+    delL(remote, local)
 
 
 # ****************************************************************************
