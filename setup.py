@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+
 import setuptools
 import os
 import json
+import subprocess
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
