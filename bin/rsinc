@@ -3,22 +3,8 @@
 # -*- coding: utf-8 -*-
 
 # ****************************************************************************
-# *                                 Settings                                 *
+# *                                 Imports                                  *
 # ****************************************************************************
-
-
-DRIVE_DIR = '~/.rsinc/' # Where config and data files will be stored
-BASE_R = 'onedrive:'    # Root path of remote drive including colon
-BASE_L = '/home/conor/' # Path to local drive to mirror remote drive
-
-DEFAULT_DIRS = ['cpp', 'cam', 'docs']  # Folders to sync when ran with -D flag
-
-CASE_INSENSATIVE = True  # Enables case checking for clouds (onedrive) that do
-                         # not support upper case letters
-
-HASH_NAME = 'SHA-1'  # Name of hash function, run 'rclone lsjson --hash $path'
-                     # to get supported hash functions from your cloud provider
-
 
 import argparse
 import os
@@ -30,6 +16,9 @@ from datetime import datetime
 
 import halo
 from clint.textui import colored
+
+DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
+DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 
 
 # ****************************************************************************
@@ -178,7 +167,7 @@ def r_sync(lcl, rmt):
                     pull(lcl.path + name, rmt.path + name)
 
         elif file.uid in rmt.uids and not file.clone \
-                                  and not rmt.uids[uid].clone:
+                and not rmt.uids[uid].clone:
             if file.time > rmt.uids[file.uid].time:
                 move(rmt.path + rmt.uids[file.uid].name, rmt.path + name)
             else:
@@ -424,11 +413,17 @@ def delR(left, right):
 # *                           Definitions / Set-up                           *
 # ****************************************************************************
 
-DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 
 print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
+
+config = read(DRIVE_DIR + 'config.json')
+
+BASE_R = config['BASE_R']
+BASE_L = config['BASE_L']
+CASE_INSENSATIVE = config['CASE_INSENSATIVE']
+HASH_NAME = config['HASH_NAME']
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
@@ -443,13 +438,10 @@ grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
-LOGIC = [[null,      pull,       delL,   conflict],
-         [push,      conflict,   push,   conflict],
-         [delR,      pull,       null,   pull],
-         [conflict,  conflict,   push,   conflict], ]
-
-if not os.path.exists(DRIVE_DIR):
-    subprocess.run(['mkdir', DRIVE_DIR])
+LOGIC = [[null, pull, delL, conflict],
+         [push, conflict, push, conflict],
+         [delR, pull, null, pull],
+         [conflict, conflict, push, conflict], ]
 
 # Decide which folder(s) to sync
 CWD = os.getcwd()
@@ -466,12 +458,9 @@ else:
     else:
         cwd = ['/'.join(cwd)]
 
-#Set up logging
-if not os.path.exists(DRIVE_DIR + 'logs/'):
-    subprocess.run(['mkdir', DRIVE_DIR + 'logs/'])
-
+# Set up logging
 log_file = DRIVE_DIR + 'logs/' + datetime.now().strftime('%Y-%m-%d')
-logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S', 
+logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S',
                     format='%(asctime)s %(levelname)s: %(message)s')
 
 
@@ -482,15 +471,19 @@ logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S',
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("folders", help="folders to sync", nargs='*')
-parser.add_argument("-d", "--dry", action="store_true", help="do a dry run")
+parser.add_argument("folders", help="Folders to sync", nargs='*')
+parser.add_argument("-d", "--dry", action="store_true", help="Fo a dry run")
 parser.add_argument("-c", "--clean", action="store_true",
-                    help="clean directories")
-parser.add_argument("-D", "--default", help="sync defaults",
+                    help="Clean directories")
+parser.add_argument("-D", "--default", help="Sync defaults",
                     action="store_true")
 parser.add_argument("-r", "--recovery", action="store_true",
-                    help="enter recovery mode")
-parser.add_argument("-a", "--auto", help="don't ask permissions",
+                    help="Enter recovery mode")
+parser.add_argument("-a", "--auto", help="Don't ask permissions",
+                    action="store_true")
+parser.add_argument("-p", "--purge", help="Reset history for all folders",
+                    action="store_true")
+parser.add_argument("-s", "--save", help="Force save state to master",
                     action="store_true")
 
 args = parser.parse_args()
@@ -511,6 +504,9 @@ recover = args.recovery
 # *                               Main Program                               *
 # ****************************************************************************
 
+if args.purge:
+    print(ylw('WARN'), 'Purging history of all folders')
+    write(DRIVE_DIR + 'master.json', empty())
 
 # get the master structure
 if not os.path.exists(DRIVE_DIR + 'master.json'):
@@ -532,6 +528,8 @@ if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
 
 for folder in folders:
     print('')
+    save = args.save
+
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
@@ -543,6 +541,7 @@ for folder in folders:
     else:
         print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
         recover = True
+        save = True
 
     # Scan directories
     spin.start(("Crawling: ") + qt(folder))
@@ -582,19 +581,10 @@ for folder in folders:
         elif auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
             counter = 0
-            
+            save = True
+
             write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
             sync(old, lcl, rmt)
-
-            # Merge into master and clean up
-            spin.start(grn('Saving: ') + qt(min_path))
-
-            merge(master, min_path, pack(lsl(BASE_L + min_path)))
-            write(DRIVE_DIR + 'master.json', master)
-
-            subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
-
-            spin.stop_and_persist(symbol='✔')
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(min_path))
@@ -602,7 +592,19 @@ for folder in folders:
             subprocess.run(["rclone", 'rmdirs', path_rmt])
             subprocess.run(["rclone", 'rmdirs', path_lcl])
 
-            spin.stop_and_persist(symbol='✔')        
+            spin.stop_and_persist(symbol='✔')
+
+    # Merge into master and clean up
+    if save:
+        spin.start(grn('Saving: ') + qt(min_path))
+
+        merge(master, min_path, pack(lsl(BASE_L + min_path)))
+        write(DRIVE_DIR + 'master.json', master)
+
+        if os.path.exists(DRIVE_DIR + 'rsinc.tmp')
+            subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
+
+        spin.stop_and_persist(symbol='✔')
 
     recover = args.recovery
 

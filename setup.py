@@ -1,4 +1,6 @@
 import setuptools
+import os
+import json
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -21,3 +23,21 @@ setuptools.setup(
         "Operating System :: Unix",
     ],
 )
+
+DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
+DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
+
+defult_config = {'BASE_R': 'onedrive:',
+                 'BASE_L': '/home/conor/',
+                 'CASE_INSENSATIVE': True,
+                 'HASH_NAME': 'SHA-1', }
+
+if not os.path.exists(DRIVE_DIR):
+    subprocess.run(['mkdir', DRIVE_DIR])
+
+if not os.path.exists(DRIVE_DIR + 'logs/'):
+    subprocess.run(['mkdir', DRIVE_DIR + 'logs/'])
+
+if not os.path.exists(DRIVE_DIR + 'config.json'):
+    with open(DRIVE_DIR + 'config.json', 'w') as file:
+        json.dump(defult_config, file, sort_keys=True, indent=4)
