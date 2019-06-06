@@ -42,7 +42,7 @@ Run rsinc with: `rsinc 'path1 path2 etc'` where `path1`, `path2` are paths to fo
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
-Rsinc will detect the first run on a path and launch **recovery mode** which will make the two paths (local and remote) identical by copying any files that exist on just one side to the other and copying the newest version of any files that exist both sides to the other. It also matches moves for any files for which this can be uniquely determined (i.e. there exists only one copy of this file on each of local and remote). Recovery mode **does not delete** any files however conflicting files will be overwritten (keeping newest).
+Rsinc will detect the first run on a path and launch **recovery mode** which will make the two paths (local and remote) identical by copying any files that exist on just one side to the other and copying the newest version of any files that exist both sides to the other. It also matches moves for any files for which this can be unambiguously (i.e. there exists only one copy of this file on each of local and remote). Recovery mode **does not delete** any files however conflicting files will be overwritten (keeping newest).
 
 If it is not the first run on a path rsinc will perform a traditional two-way synchronisation, tracking if the files have been moved, deleted or updated then mirroring these actions. Conflicts are resolved by renaming the files and copying both ways (no data loss).  
 
@@ -62,7 +62,23 @@ The optional arguments available are:
 
 ### Two-Way Syncing
 
+Rsinc determines, for each file in local and remote, whether they have been updated, moved, deleted, created or stayed the same. This is achieved by comparing the files in local and remote to an image of the files in local at the last run (should to be identical remote at last run). The path (unique) of the file as well as its ID (composition of a files hash and size) are used to make these comparisons. Files are tagged as 'clones' if there exists more than one file with the same ID in a directory (i.e two copies of the same file with different names).
+
+Files tagged as created are copied to their complimentary locations. Next moves are mirrored giving preference to remote in the event of a move conflict. Rsinc checks the copies and moves do not produce a name conflict and renames first if necessary. Finally the moved and unmoved files are modified according according to:
+
+x | rmt unchanged | rmt updated | rmt deleted | rmt created
+-----------------------------------------------------------
+lcl unchanged   | do nothing    | pull rmt  | delete lcl    | conflict
+lcl updated     | push lcl      | conflict  | push lcl      | conflict
+lcl deleted     | delete rmt    | pull      | do nothing    | pull rmt
+lcl created     | conflict      | conflict  | push lcl      | conflict
+
+This allows for complex tracking such as a local moves and a remote modification being compound.
+
+
 ### Recovery Mode
+
+moves 
 
 ### Selective Syncing
 

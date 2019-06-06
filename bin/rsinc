@@ -112,7 +112,7 @@ def rename(path, name, flats):
 
     if new_name != name:
         logging.warn('Case mismatch: %s', name)
-        move(path + name, path + new_name)
+        move(path + name, path + new_name, 'Rnm')
 
     return new_name
 
@@ -152,7 +152,7 @@ def calc_states(old, new):
                 file.state = UPDATED
             else:
                 file.state = THESAME
-        elif file.uid in old.uids and file.clone == False:
+        elif file.uid in old.uids and not file.clone:
             file.moved = True
             file.state = THESAME
         else:
@@ -199,9 +199,12 @@ def sync(old, lcl, rmt):
         return
 
     pushed = Flat('null')
+    pulled = Flat('null')
+
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
             name = rename(lcl.path, name, [rmt, pushed])
+
             push(lcl.path + name, rmt.path + name)
             pushed.update(name, file.uid, file.time)
 
@@ -213,28 +216,36 @@ def sync(old, lcl, rmt):
         elif file.moved:
             if file.uid in rmt.uids and rmt.uids[file.uid].moved:
                 # Both moved to different places
-                move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
+                name = rename(lcl.path, rmt.uids[file.uid].name, [lcl, pulled])
+
+                move(lcl.path + name, lcl.path + name)
+                pulled.update(name, file.uid, file.time)
             else:
                 # Only lcl moved
+                name = rename(rmt.path, name, [rmt, pushed])
+
                 move(rmt.path + old.uids[file.uid].name, rmt.path + name)
+                pushed.update(name, file.uid, file.time)
                 LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
                     lcl.path + name, rmt.path + name)
 
         elif old.names[name].uid in rmt.uids:
             # Only rmt has moved
-            rmt_name = rmt.uids[old.names[name].uid].name
+            name = rename(
+                lcl.path, rmt.uids[old.names[name].uid].name, [lcl, pulled])
 
-            move(lcl.path + name, lcl.path + rmt_name)
-            LOGIC[file.state][THESAME](lcl.path + rmt_name, rmt.path + rmt_name)
+            move(lcl.path + name, lcl.path + name)
+            pulled.update(name, file.uid, file.time)
+            LOGIC[file.state][THESAME](lcl.path + name, rmt.path + name)
 
         else:
             print(red('WARNING:'), 'fell off switch in sync function')
             logging.warning('Fell off switch in sync function with: %s', name)
 
-    pulled = Flat('null')
     for name, file in sorted(rmt.names.items()):
         if file.state == CREATED:
             name = rename(rmt.path, name, [lcl, pulled])
+
             pull(lcl.path + name, rmt.path + name)
             pulled.update(name, file.uid, file.time)
 
@@ -243,18 +254,18 @@ def null(*args):
     return
 
 
-def move(source, dest):
+def move(source, dest, kind='Move'):
     '''Move source to dest'''
     global counter
     counter += 1
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
-              ylw(' Move: ') + source + cyn(' to: ') + dest)
-        logging.info('MOVE: %s TO %s', source, dest)
+              ylw(' %s: ' % kind) + source + cyn(' to: ') + dest)
+        logging.info('%s: %s TO %s', kind.upper(), source, dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
-        print(ylw('Move: ') + source + cyn(' to: ') + dest)
+        print(ylw(' %s: ' % kind) + source + cyn(' to: ') + dest)
 
 
 def push(source, dest):
