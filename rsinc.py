@@ -116,7 +116,7 @@ def calc_states(old, new):
             file.state = CREATED
 
     for name, file in old.names.items():
-        if name not in new.names and file.uid not in new.uids:
+        if name not in new.names and (file.uid not in new.uids or file.clone):
             new.update(name, file.uid, file.time, DELETED)
 
 
@@ -229,8 +229,8 @@ def sinc(old, lcl, rmt):
             LOGIC[file.state][rmt.names[name].state](
                 lcl.path + name, rmt.path + name)
 
-        elif file.moved == True:
-            if file.uid in rmt.uids and rmt.uids[file.uid].moved == True:
+        elif file.moved:
+            if file.uid in rmt.uids and rmt.uids[file.uid].moved:
                 # Both moved to different places
                 move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
             else:
@@ -429,7 +429,7 @@ def delL(left, right):
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + ylw(' Delete: ') + left)
-        LOG('Delete: \t' + left)
+        LOG('Del: \t' + left)
         subprocess.run(['rclone', 'delete', left])
     else:
         print(ylw("Delete: ") + left)
@@ -607,8 +607,12 @@ for folder in folders:
             spin.stop_and_persist(symbol='✔')
 
         if args.clean:
-                subprocess.run(["rclone", 'rmdirs', path_rmt])
-                subprocess.run(["rclone", 'rmdirs', path_lcl])
+            spin.start(grn('Pruning: ') + qt(min_path))
+
+            subprocess.run(["rclone", 'rmdirs', path_rmt])
+            subprocess.run(["rclone", 'rmdirs', path_lcl])
+
+            spin.stop_and_persist(symbol='✔')
 
     if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
         subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
