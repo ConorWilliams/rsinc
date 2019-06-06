@@ -601,7 +601,7 @@ for folder in folders:
         merge(master, min_path, pack(lsl(BASE_L + min_path)))
         write(DRIVE_DIR + 'master.json', master)
 
-        if os.path.exists(DRIVE_DIR + 'rsinc.tmp')
+        if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
             subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
 
         spin.stop_and_persist(symbol='✔')
