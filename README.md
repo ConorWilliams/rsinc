@@ -33,7 +33,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 }
 ```
 
-`BASE_L` is the absolute path to the local 'root' that your remote will be synced to. `BASE_R` is the name of your rclone remote. `CASE_INSENSATIVE` 
+`BASE_L` is the absolute path to the local 'root' that your remote will be synced to. `BASE_R` is the name of your rclone remote. `CASE_INSENSATIVE` is a boolian flag that contols the case checking if both remote and local have the same case sensitivity this can be set to false else set true. `DEFAULT_DIRS` are a list of first level dircetories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` / `--default` flags.
 
 
 ## Using
