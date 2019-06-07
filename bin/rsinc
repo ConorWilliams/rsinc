@@ -202,9 +202,8 @@ def sync(old, lcl, rmt):
         elif file.moved:
             if file.uid in rmt.uids and rmt.uids[file.uid].moved:
                 # Both moved to different places
-                nn = rename(lcl.path, rmt.uids[file.uid].name, [lcl, pulled])
-                move(lcl.path + name, lcl.path + nn)
-                pulled.update(nn, file.uid, file.time)
+                nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
+                nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
             elif file.uid in rmt.uids and rmt.uids[file.uid].clone:
                 # Both moved, rmt is clone
                 nn = rename(lcl.path, name, [rmt, pushed])
@@ -212,9 +211,9 @@ def sync(old, lcl, rmt):
                 pushed.update(nn, file.uid, file.time)
             else:
                 # Only lcl moved
-                nn = rename(rmt.path, name, [rmt, pushed])
-                move(rmt.path + old.uids[file.uid].name, rmt.path + nn)
-                pushed.update(nn, file.uid, file.time)
+                nn = move(old.uids[file.uid].name, name, t_rmt, t_rmt)
+                nn = balance_names(name, nn, t_lcl, t_rmt)
+
                 rmoved.update(old.uids[file.uid].name, file.uid, file.time)
 
                 LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
@@ -224,10 +223,8 @@ def sync(old, lcl, rmt):
             # Only rmt has moved
             change, nn = move(name, rmt.uids[old.names[name].uid].name,
                               t_lcl, t_lcl)
-            if change:
-                nn = balance_names(nn, rmt.uids[old.names[name].uid].name,
-                                   t_lcl, t_rmt)
-
+            nn = balance_names(nn, rmt.uids[old.names[name].uid].name,
+                               t_lcl, t_rmt)
             LOGIC[file.state][THESAME](lcl.path + nn, rmt.path + nn)
 
         else:
@@ -305,9 +302,8 @@ def move(name_s, name_d, flats_s=[], flats_d=[]):
 
     if name_d == new_name_d:
         flats_d[1].update(new_name_d, 'null', 0)
-        return False, new_name_d
-    else:
-        return True, new_name_d
+
+    return new_name_d
 
 
 def push(source, dest):
