@@ -33,7 +33,7 @@ DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
 DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
 
 defult_config = {'BASE_R': 'onedrive:',
-                 'BASE_L': os.path.expanduser('~/') + '/',
+                 'BASE_L': os.path.expanduser('~/'),
                  'CASE_INSENSATIVE': True,
                  'HASH_NAME': 'SHA-1',
                  "DEFAULT_DIRS": ["cpp", "docs", "cam"], }
