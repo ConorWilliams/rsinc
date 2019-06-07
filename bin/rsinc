@@ -112,7 +112,7 @@ def rename(path, name, flats):
 
     if new_name != name:
         logging.warn('Case mismatch: %s', name)
-        move(path + name, path + new_name, 'Rnm')
+        move(path + name, path + new_name, kind='Rename')
 
     return new_name
 
@@ -266,7 +266,7 @@ def null(*args):
     return
 
 
-def move(source, dest, kind='Move'):
+def move(source, dest, flats=[Flat('null')], kind='Move'):
     '''Move source to dest'''
     global counter
     counter += 1
