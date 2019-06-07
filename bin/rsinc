@@ -36,7 +36,8 @@ class File():
         self.time = time
         self.state = state
         self.moved = False
-        self.clone = False
+        self.is_clone = False
+        self.synced = False
 
 
 class Flat():
@@ -53,10 +54,14 @@ class Flat():
         self.lower.add(name.lower())
 
         if uid in self.uids:
-            self.names[name].clone = True
-            self.uids[uid].clone = True
+            self.names[name].is_clone = True
+            self.uids[uid].is_clone = True
         else:
             self.uids.update({uid: self.files[-1]})
+
+    def clean():
+        for file in self.files:
+            file.synced = False
 
 
 # ****************************************************************************
@@ -129,21 +134,21 @@ def calc_states(old, new):
                 file.state = UPDATED
             else:
                 file.state = THESAME
-        elif file.uid in old.uids and not file.clone:
+        elif file.uid in old.uids and not file.is_clone:
             file.moved = True
             file.state = THESAME
         else:
             file.state = CREATED
 
     for name, file in old.names.items():
-        if name not in new.names and (file.uid not in new.uids or file.clone):
+        if name not in new.names and (file.uid not in new.uids or file.is_clone):
             new.update(name, file.uid, file.time, DELETED)
 
 
 def r_sync(lcl, rmt):
     '''Recovery sync function'''
-    pushed = Flat('pushed')
-    pulled = Flat('pulled')
+    t_rmt = [rmt, Flat('new_rmt')]  # For all names in rmt
+    t_lcl = [lcl, Flat('new_lcl')]  # For all names in lcl
 
     for name, file in lcl.names.items():
         if name in rmt.names:
@@ -153,11 +158,10 @@ def r_sync(lcl, rmt):
                 else:
                     pull(lcl.path + name, rmt.path + name)
 
-        elif file.uid in rmt.uids and not file.clone and not rmt.uids[uid].clone:
+        elif file.uid in rmt.uids and not file.is_clone and not rmt.uids[uid].is_clone:
             if file.time > rmt.uids[file.uid].time:
-                name = rename(rmt.path, name, [pushed, rmt])
-                move(rmt.path + rmt.uids[file.uid].name, rmt.path + name)
-                pushed.update(name, file.uid, file.time)
+                nn = move(rmt.uids[file.uid].name, name, t_rmt, t_rmt)
+                nn = balance_names(name, nn, t_lcl, t_rmt)
             else:
                 name = rename(lcl.path, name, [pulled, lcl])
                 move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
@@ -169,8 +173,8 @@ def r_sync(lcl, rmt):
 
     for name, file in rmt.names.items():
         if name not in lcl.names and \
-                (file.uid not in lcl.uids or file.clone or
-                 (file.uid in lcl.uids and lcl.uids[file.uid].clone)):
+                (file.uid not in lcl.uids or file.is_clone or
+                 (file.uid in lcl.uids and lcl.uids[file.uid].is_clone)):
 
             name = rename(rmt.path, name, [lcl, pulled])
             pull(lcl.path + name, rmt.path + name)
@@ -204,7 +208,7 @@ def sync(old, lcl, rmt):
                 # Both moved to different places
                 nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
                 nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
-            elif file.uid in rmt.uids and rmt.uids[file.uid].clone:
+            elif file.uid in rmt.uids and rmt.uids[file.uid].is_clone:
                 # Both moved, rmt is clone
                 nn = rename(lcl.path, name, [rmt, pushed])
                 push(lcl.path + nn, rmt.path + nn)
@@ -219,7 +223,7 @@ def sync(old, lcl, rmt):
                 LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
                     lcl.path + nn, rmt.path + nn)
 
-        elif old.names[name].uid in rmt.uids and not rmt.uids[old.names[name].uid].clone:
+        elif old.names[name].uid in rmt.uids and not rmt.uids[old.names[name].uid].is_clone:
             # Only rmt has moved
             change, nn = move(name, rmt.uids[old.names[name].uid].name,
                               t_lcl, t_lcl)
