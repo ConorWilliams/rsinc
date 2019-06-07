@@ -59,7 +59,7 @@ class Flat():
         else:
             self.uids.update({uid: self.files[-1]})
 
-    def clean():
+    def clean(self):
         for file in self.files:
             file.synced = False
 
@@ -181,7 +181,7 @@ def r_sync(lcl, rmt):
             pulled.update(name, file.uid, file.time)
 
 
-def sync(old, lcl, rmt)
+def sync(old, lcl, rmt):
     t_rmt = [rmt, Flat('new_rmt')]  # For all names in rmt
     t_lcl = [lcl, Flat('new_lcl')]  # For all names in lcl
 
@@ -198,7 +198,7 @@ CLONE = 2
 NOT = 3
 
 
-def calc_mv_state(file, rmt)
+def calc_mv_state(file, rmt):
     if file.is_clone:
         i = CLONE
     elif file.moved:
@@ -209,9 +209,9 @@ def calc_mv_state(file, rmt)
     if file.name not in rmt.names:
         j = NOT
     else:
-        if rmt.names[name].is_clone:
+        if rmt.names[file.name].is_clone:
             j = CLONE
-        elif rmt.names[name].moved:
+        elif rmt.names[file.name].moved:
             j = MOVED
         else:
             j = SAME
@@ -227,26 +227,43 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
             continue
         s = calc_mv_state(file, rmt)
 
-        if s == (SAME, SAME)
-        if s == (NCM, NCNM) or (0, 1)
+        if s == (SAME, SAME):
+            pass
+        elif s == (MOVED, SAME) or s == (SAME, MOVED):
+            pass
+        elif s == (CLONE, SAME) or s == (SAME, CLONE):
+            pass
+        elif s == (MOVED, MOVED):
+            pass
+        elif s == (CLONE, MOVED) or s == (MOVED, CLONE):
+            pass
+        elif s == (CLONE, CLONE):
+            pass
 
+        elif s == (SAME, NOT):
+            pass
+        elif s == (MOVED, NOT):
+            pass
+        elif s == (CLONE, NOT):
+            pass
 
-#     nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
-#     nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
-# elif file.uid in rmt.uids and rmt.uids[file.uid].is_clone:
-#     # Both moved, rmt is clone
-#     nn = rename(lcl.path, name, [rmt, pushed])
-#     push(lcl.path + nn, rmt.path + nn)
-#     pushed.update(nn, file.uid, file.time)
-# else:
-#     # Only lcl moved
-#     nn = move(old.uids[file.uid].name, name, t_rmt, t_rmt)
-#     nn = balance_names(name, nn, t_lcl, t_rmt)
+            #     nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
+            #     nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
+            # elif file.uid in rmt.uids and rmt.uids[file.uid].is_clone:
+            #     # Both moved, rmt is clone
+            #     nn = rename(lcl.path, name, [rmt, pushed])
+            #     push(lcl.path + nn, rmt.path + nn)
+            #     pushed.update(nn, file.uid, file.time)
+            # else:
+            #     # Only lcl moved
+            #     nn = move(old.uids[file.uid].name, name, t_rmt, t_rmt)
+            #     nn = balance_names(name, nn, t_lcl, t_rmt)
 
-#     rmoved.update(old.uids[file.uid].name, file.uid, file.time)
+            #     rmoved.update(old.uids[file.uid].name, file.uid, file.time)
 
-#     LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
-#         lcl.path + nn, rmt.path + nn)
+            #     LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
+            #         lcl.path + nn, rmt.path + nn)
+
 
 def null(*args):
     return
