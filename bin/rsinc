@@ -94,29 +94,6 @@ def prepend(name, prefix):
     return new_name
 
 
-def rename(path, name, flats):
-    '''
-    Detects if 'name' has any case conflicts in any of the Flat()'s in 'flats'.
-    If it does name is modified until no case conflicts occur and the new name
-    returned
-    '''
-    if not CASE_INSENSATIVE:
-        return name
-
-    new_name = name
-
-    for flat in flats:
-        while new_name.lower() in flat.lower:
-            print(red('ERROR,'), 'case mismatch:', new_name + ', renaming')
-            new_name = prepend(new_name, '_')
-
-    if new_name != name:
-        logging.warn('Case mismatch: %s', name)
-        move(path + name, path + new_name, kind='Rename')
-
-    return new_name
-
-
 def lsl(path):
     '''
     Runs rclone lsjson on path and returns a dict containing each file with the
@@ -165,8 +142,8 @@ def calc_states(old, new):
 
 def r_sync(lcl, rmt):
     '''Recovery sync function'''
-    pushed = Flat('null')
-    pulled = Flat('null')
+    pushed = Flat('pushed')
+    pulled = Flat('pulled')
 
     for name, file in lcl.names.items():
         if name in rmt.names:
@@ -206,9 +183,10 @@ def sync(old, lcl, rmt):
         r_sync(lcl, rmt)
         return
 
-    pushed = Flat('null')  # New names in rmt
-    pulled = Flat('null')  # New names in lcl
-    rmoved = Flat('null')  # Moved in rmt
+    t_rmt = [rmt, Flat('new_rmt')]  # For all names in rmt
+    t_lcl = [lcl, Flat('new_lcl')]  # For all names in lcl
+
+    rmoved = Flat('rmoved')  # Moved in rmt
 
     for name, file in sorted(lcl.names.items()):
         if file.state == CREATED:
@@ -244,10 +222,11 @@ def sync(old, lcl, rmt):
 
         elif old.names[name].uid in rmt.uids and not rmt.uids[old.names[name].uid].clone:
             # Only rmt has moved
-            nn = rename(
-                lcl.path, rmt.uids[old.names[name].uid].name, [lcl, pulled])
-            move(lcl.path + name, lcl.path + nn)
-            pulled.update(nn, file.uid, file.time)
+            change, nn = move(name, rmt.uids[old.names[name].uid].name,
+                              t_lcl, t_lcl)
+            if change:
+                nn = balance_names(nn, rmt.uids[old.names[name].uid].name,
+                                   t_lcl, t_rmt)
 
             LOGIC[file.state][THESAME](lcl.path + nn, rmt.path + nn)
 
@@ -266,18 +245,69 @@ def null(*args):
     return
 
 
-def move(source, dest, flats=[Flat('null')], kind='Move'):
+def balance_names(name_lcl, name_rmt, flats_lcl=[], flats_rmt=[]):
+    '''Used to match names when a move and rename generates a case conflict'''
+    nn_lcl = name_lcl
+    nn_rmt = name_rmt
+
+    while nn_lcl != nn_rmt:
+        nn_lcl = nn_rmt
+        resolve_case(nn_lcl, flats_lcl)
+        resolve_case(nn_rmt, flats_rmt)
+
+    if nn_lcl != name_lcl:
+        move(name_lcl, nn_lcl, flats_lcl, flats_lcl)
+    if nn_rmt != name_rmt:
+        move(name_rmt, nn_rmt, flats_rmt, flats_rmt)
+
+    return nn_lcl
+
+
+def resolve_case(name, flats=[]):
+    '''
+    Detects if 'name_s' has any case conflicts in any of the Flat()'s in 
+    'flats_d'. If it does name is modified until no case conflicts occur and the 
+    new name returned
+    '''
+    if not CASE_INSENSATIVE:
+        return name_d
+
+    new_name = name
+
+    for flat in flats:
+        while new_name.lower() in flat.lower:
+            new_name = prepend(new_name, '_')
+
+    return new_name
+
+
+def move(name_s, name_d, flats_s=[], flats_d=[]):
     '''Move source to dest'''
     global counter
     counter += 1
 
+    for flat in flats_d:
+        if name_d in flats_d.names:
+            print(red('ERROR:'), name_d, 'in', flats_d[0].path)
+
+    new_name_d = resolve_case(name_d, flats_d)
+
+    source = flats_s[0].path + name_s
+    dest = flats_d[0].path + new_name_d
+
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
-              ylw(' %s: ' % kind) + source + cyn(' to: ') + dest)
-        logging.info('%s: %s TO %s', kind.upper(), source, dest)
+              ylw(' Move: ') + source + cyn(' to: ') + dest)
+        logging.info('MOVE: %s TO %s', source, dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
-        print(ylw('%s: ' % kind) + source + cyn(' to: ') + dest)
+        print(ylw('Move: ') + source + cyn(' to: ') + dest)
+
+    if name_d == new_name_d:
+        flats_d[1].update(new_name_d, 'null', 0)
+        return False, new_name_d
+    else:
+        return True, new_name_d
 
 
 def push(source, dest):
@@ -586,7 +616,7 @@ for folder in folders:
 
     lcl = lsl(path_lcl)
     rmt = lsl(path_rmt)
-    old = Flat('null')
+    old = Flat('old')
 
     spin.stop_and_persist(symbol='✔')
 
