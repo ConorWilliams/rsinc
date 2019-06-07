@@ -196,6 +196,8 @@ SAME = 0
 MOVED = 1
 CLONE = 2
 NOT = 3
+MOVED_N = 4  # MOVED name trace
+MOVED_U = 5  # MOVED uid trace
 
 
 def calc_mv_state(file, rmt):
@@ -219,12 +221,37 @@ def calc_mv_state(file, rmt):
     return (i, j)
 
 
+def trace_rmt(file, old, rmt):
+    if file.moved:
+        old.file = old.uids[file.uid]
+    else:
+        old_file = old.names[file.name]
+
+    if old_file.name in rmt.names:
+        if rmt.names[old_file.name].is_clone:
+            trace = CLONE
+        elif rmt.names[old_file.name].moved:
+            trace = MOVED_N
+        else:
+            trace = SAME
+    elif old_file.uid in rmt.uids:
+        if rmt.uids[old_file.uid].is_clone:
+            trace = CLONE
+        elif rmt.uids[old_file.uid].moved:
+            trace = MOVED_U
+        else:
+            trace = SAME
+    else:
+        trace = NOT
+
+
 def _sync(old, lcl, rmt, t_lcl, t_rmt):
     '''Normal sync function'''
 
-    for name, file in lcl.names.items():
+    for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
+
         s = calc_mv_state(file, rmt)
 
         if s == (SAME, SAME):
@@ -240,12 +267,15 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
         elif s == (CLONE, CLONE):
             pass
 
+        elif s == (CLONE, NOT):
+            pass
         elif s == (SAME, NOT):
             pass
         elif s == (MOVED, NOT):
             pass
-        elif s == (CLONE, NOT):
-            pass
+        else:
+            logging.error('Fell off switch in _sync, s = (%d,%d), name = %s',
+                          s[0], s[1], name)
 
             #     nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
             #     nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
