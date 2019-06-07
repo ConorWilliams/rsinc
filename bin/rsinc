@@ -255,17 +255,22 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
         s = calc_mv_state(file, rmt)
 
         if s == (SAME, SAME):
-            pass
+            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
+            rmt.names[name].synced = True
         elif s == (MOVED, SAME) or s == (SAME, MOVED):
-            pass
+            conflict(name, name, t_lcl, t_rmt)
+            rmt.names[name].synced = True
         elif s == (CLONE, SAME) or s == (SAME, CLONE):
-            pass
+            # Possible can be conflict
+            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
         elif s == (MOVED, MOVED):
+            if old.uids[file.uid].is_clone:
+                conflict(name, name, t_lcl, t_rmt)
             pass
         elif s == (CLONE, MOVED) or s == (MOVED, CLONE):
             pass
         elif s == (CLONE, CLONE):
-            pass
+            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
 
         elif s == (CLONE, NOT):
             pass
