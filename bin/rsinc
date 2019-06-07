@@ -269,7 +269,7 @@ def null(*args):
     return
 
 
-def balance_names(name_lcl, name_rmt, flats_lcl=[], flats_rmt=[]):
+def balance_names(name_lcl, name_rmt, flats_lcl, flats_rmt):
     '''Used to match names when a move and rename generates a case conflict'''
     nn_lcl = name_lcl
     nn_rmt = name_rmt
@@ -287,7 +287,7 @@ def balance_names(name_lcl, name_rmt, flats_lcl=[], flats_rmt=[]):
     return nn_lcl
 
 
-def resolve_case(name, flats=[]):
+def resolve_case(name, flats):
     '''
     Detects if 'name_s' has any case conflicts in any of the Flat()'s in 
     'flats_d'. If it does name is modified until no case conflicts occur and the 
@@ -305,7 +305,7 @@ def resolve_case(name, flats=[]):
     return new_name
 
 
-def move(name_s, name_d, flats_s=[], flats_d=[]):
+def move(name_s, name_d, flats_s, flats_d):
     '''Move source to dest'''
     global counter
     counter += 1
@@ -333,8 +333,11 @@ def move(name_s, name_d, flats_s=[], flats_d=[]):
     return new_name_d
 
 
-def push(source, dest):
+def push(name_s, name_d, flats_s, flats_d):
     '''Copy source (at local) to dest (at remote)'''
+    source = flats_s[0].path + name_s
+    dest = flats_d[0].path + name_d
+
     global counter, LOG
     counter += 1
 
@@ -346,8 +349,11 @@ def push(source, dest):
         print(cyn("Push: ") + source)
 
 
-def pull(dest, source):
+def pull(name_s, name_d, flats_s, flats_d):
     '''Copy source (at remote) to dest (at local)'''
+    dest = flats_s[0].path + name_s
+    source = flats_d[0].path + name_d
+
     global counter, LOG
     counter += 1
 
@@ -359,8 +365,12 @@ def pull(dest, source):
         print(mgt("Pull: ") + source)
 
 
-def conflict(source, dest):
+def conflict(name_s, name_d, flats_s, flats_d):
     '''Rename and copy conflicts both ways'''
+
+    #
+    # NEEDS FIXING WITH NEW SAFE MOVE API
+    #
 
     print(red('Conflict: ') + source)
 
@@ -374,8 +384,10 @@ def conflict(source, dest):
     pull(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
 
 
-def delL(local, remote):
+def delL(name_s, name_d, flats_s, flats_d):
     '''Delete local (at local)'''
+    local = flats_s[0].path + name_s
+
     global counter
     counter += 1
 
@@ -387,9 +399,9 @@ def delL(local, remote):
         print(ylw("Delete: ") + local)
 
 
-def delR(local, remote):
+def delR(name_s, name_d, flats_s, flats_d):
     '''Delete remote (at remote)'''
-    delL(remote, local)
+    delL(name_d, name_s, flats_d, flats_s)
 
 
 # ****************************************************************************
