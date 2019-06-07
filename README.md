@@ -66,15 +66,16 @@ Rsinc determines, for each file in local and remote, whether they have been upda
 
 Files tagged as created are copied to their complimentary locations. Next moves are mirrored giving preference to remote in the event of a move conflict. Rsinc checks the copies and moves do not produce a name conflict and renames first if necessary. Finally the moved and unmoved files are modified according according to:
 
-state | rmt unchanged | rmt updated | rmt deleted | rmt created
------ | ------------- | ----------- | ----------- |  ----------
-lcl unchanged   | do nothing    | pull rmt  | delete lcl    | conflict
-lcl updated     | push lcl      | conflict  | push lcl      | conflict
-lcl deleted     | delete rmt    | pull      | do nothing    | pull rmt
-lcl created     | conflict      | conflict  | push lcl      | conflict
+state | remote unchanged | remote updated | remote deleted | remote created
+----- | ---------------- | -------------- | -------------- |  -------------
+local unchanged   | do nothing    | pull remote | delete local  | conflict
+local updated     | push local    | conflict    | push local    | conflict
+local deleted     | delete remote | pull        | do nothing    | pull remote
+local created     | conflict      | conflict    | push local    | conflict
 
 This allows for complex tracking such as a local moves and a remote modification being compound.
 
+Through out rsinc clones are never moved as movements cannot be unambiguously determined.
 
 ### Recovery Mode
 
