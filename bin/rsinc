@@ -307,7 +307,7 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
 
         elif s == (SAME, NOT):
             if file.state == DELETED:
-                # will hit moved x in next pass if moved in rmt
+                # will hit MOVED:x in next pass if moved in rmt
                 continue
 
             t, f_rmt = trace_rmt(file, old, rmt)
@@ -436,11 +436,6 @@ def copy(name_s, name_d, flats_s, flats_d):
         print(cyn('Copy: ') + source + cyn(' to: ') + dest)
 
 
-def push(name_s, name_d, flats_s, flats_d):
-    '''Copy source (at local) to dest (at remote)'''
-    copy(name_s, name_d, flats_s, flats_d)
-
-
 def pull(name_s, name_d, flats_s, flats_d):
     '''Copy source (at remote) to dest (at local)'''
     copy(name_d, name_s, flats_d, flats_s)
@@ -448,21 +443,16 @@ def pull(name_s, name_d, flats_s, flats_d):
 
 def conflict(name_s, name_d, flats_s, flats_d):
     '''Rename and copy conflicts both ways'''
-
-    #
-    # NEEDS FIXING WITH NEW SAFE MOVE / PUSH API
-    #
-
     print(red('Conflict: ') + source)
 
     if not dry_run:
         logging.warning('CONFLICT: %s', source)
 
-    safe_move(source, prepend(source, 'lcl_'))
-    safe_move(dest, prepend(dest, 'rmt_'))
+    nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flats_s, flats_s)
+    nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flats_d, flats_d)
 
-    push(prepend(source, 'lcl_'), prepend(dest, 'lcl_'))
-    pull(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
+    safe_copy(nn_lcl, nn_lcl, flats_s, flats_d)
+    safe_copy(nn_rmt, nn_rmt, flats_d, flats_s)
 
 
 def delL(name_s, name_d, flats_s, flats_d):
@@ -623,9 +613,9 @@ grn = colored.green    # info
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 LOGIC = [[null, pull, delL, conflict],
-         [push, conflict, push, conflict],
+         [push, conflict, copy, conflict],
          [delR, pull, null, pull],
-         [conflict, conflict, push, conflict], ]
+         [conflict, conflict, copy, conflict], ]
 
 # Decide which folder(s) to sync
 CWD = os.getcwd()
