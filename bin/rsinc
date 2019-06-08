@@ -142,7 +142,11 @@ def calc_states(old, new):
 
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
-            new.update(name, file.uid, file.time, DELETED)
+            uid = file.uid
+            while uid in new.uids:
+                # Force unique delete place-holders
+                uid += '0'
+            new.update(name, uid, file.time, DELETED)
 
 
 def r_sync(lcl, rmt):
@@ -202,7 +206,10 @@ MOVED_U = 5  # MOVED uid trace
 
 def calc_mv_state(file, rmt):
     if file.is_clone:
-        i = CLONE
+        if file.state == CREATED:
+            i = CLONE
+        else:
+            i = SAME
     elif file.moved:
         i = MOVED
     else:
@@ -223,18 +230,28 @@ def calc_mv_state(file, rmt):
 
 def trace_rmt(file, old, rmt):
     if file.moved:
-        old.file = old.uids[file.uid]
+        old_file = old.uids[file.uid]
+        if old_file.is_clone:
+            # Can't track clones by uid, returning CLONE forces push
+            return CLONE, '?'
     else:
         old_file = old.names[file.name]
 
     if old_file.name in rmt.names:
+        rmt_file = rmt.names[old_file.name]
+
         if rmt.names[old_file.name].is_clone:
-            trace = CLONE
+            if mt.names[old_file.name].state == CREATED:
+                trace = CLONE
+            else:
+                trace = SAME
         elif rmt.names[old_file.name].moved:
             trace = MOVED_N
         else:
             trace = SAME
     elif old_file.uid in rmt.uids:
+        rmt_file = rmt.uids[old_file.uid]
+
         if rmt.uids[old_file.uid].is_clone:
             trace = CLONE
         elif rmt.uids[old_file.uid].moved:
@@ -244,9 +261,13 @@ def trace_rmt(file, old, rmt):
     else:
         trace = NOT
 
+    return trace, rmt_file
+
 
 def _sync(old, lcl, rmt, t_lcl, t_rmt):
     '''Normal sync function'''
+    do_logic = [(SAME, SAME), (SAME, CLONE), (CLONE, SAME), (CLONE, CLONE)]
+    do_cnflct = [(MOVED, SAME), (SAME, MOVED), (MOVED, CLONE), (CLONE, MOVED)]
 
     for name, file in sorted(lcl.names.items()):
         if file.synced:
@@ -254,50 +275,61 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
 
         s = calc_mv_state(file, rmt)
 
-        if s == (SAME, SAME):
-            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
+        if s in do_logic:
             rmt.names[name].synced = True
-        elif s == (MOVED, SAME) or s == (SAME, MOVED):
-            conflict(name, name, t_lcl, t_rmt)
-            rmt.names[name].synced = True
-        elif s == (CLONE, SAME) or s == (SAME, CLONE):
-            # Possible can be conflict
-            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
-        elif s == (MOVED, MOVED):
-            if old.uids[file.uid].is_clone:
-                conflict(name, name, t_lcl, t_rmt)
-            pass
-        elif s == (CLONE, MOVED) or s == (MOVED, CLONE):
-            pass
-        elif s == (CLONE, CLONE):
             LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
 
+        elif s in do_cnflct:
+            rmt.names[name].synced = True
+            conflict(name, name, t_lcl, t_rmt)
+
+        elif s == (MOVED, MOVED):
+            rmt.names[name].synced = True
+            if file.uid != rmt.names[name].uid:
+                conflict(name, name, t_lcl, t_rmt)
+
         elif s == (CLONE, NOT):
-            pass
+            safe_push(name, t_lcl, t_rmt)
+
         elif s == (SAME, NOT):
-            pass
+            if file.state == DELETED
+                #will hit moved x in next pass if moved in rmt
+                continue
+
+            t = trace(name, old, rmt)
+
+            if t == MOVED_U:
+                f_rmt.synced = True
+                nn = safe_move(rmt_name, name, t_rmt, t_rmt)
+                nn = balance(name, nn, , t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+            elif t == CLONE or NOT:
+                safe_push(name, t_lcl, t_rmt)
+            else:
+                logging.error(
+                    'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
+
         elif s == (MOVED, NOT):
-            pass
+            t, f_rmt = trace(name, old, rmt)
+
+            if t == SAME:
+                f_rmt.synced = True
+                nn = safe_move(rmt_name, name, t_rmt, t_rmt)
+                nn = balance(name, nn, , t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+            elif t == MOVED_U:
+                f_rmt.synced = True
+                nn = safe_move(name, rmt_name, t_lcl, t_lcl)
+                nn = balance(nn, rmt_name, t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+            elif t == MOVED_N or CLONE or NOT:
+                safe_push(name, t_lcl, t_rmt)
+            else:
+                logging.error('Fell off switch in _sync, s = (%d,%d), t = %s, name = %s',
+                              s[0], s[1], t, name)
         else:
             logging.error('Fell off switch in _sync, s = (%d,%d), name = %s',
                           s[0], s[1], name)
-
-            #     nn = move(name, rmt.uids[file.uid].name, t_lcl, t_lcl)
-            #     nn = balance_names(nn, rmt.uids[file.uid].name, t_lcl, t_rmt)
-            # elif file.uid in rmt.uids and rmt.uids[file.uid].is_clone:
-            #     # Both moved, rmt is clone
-            #     nn = rename(lcl.path, name, [rmt, pushed])
-            #     push(lcl.path + nn, rmt.path + nn)
-            #     pushed.update(nn, file.uid, file.time)
-            # else:
-            #     # Only lcl moved
-            #     nn = move(old.uids[file.uid].name, name, t_rmt, t_rmt)
-            #     nn = balance_names(name, nn, t_lcl, t_rmt)
-
-            #     rmoved.update(old.uids[file.uid].name, file.uid, file.time)
-
-            #     LOGIC[THESAME][rmt.names[old.uids[file.uid].name].state](
-            #         lcl.path + nn, rmt.path + nn)
 
 
 def null(*args):
@@ -315,9 +347,9 @@ def balance_names(name_lcl, name_rmt, flats_lcl, flats_rmt):
         resolve_case(nn_rmt, flats_rmt)
 
     if nn_lcl != name_lcl:
-        move(name_lcl, nn_lcl, flats_lcl, flats_lcl)
+        safe_move(name_lcl, nn_lcl, flats_lcl, flats_lcl)
     if nn_rmt != name_rmt:
-        move(name_rmt, nn_rmt, flats_rmt, flats_rmt)
+        safe_move(name_rmt, nn_rmt, flats_rmt, flats_rmt)
 
     return nn_lcl
 
@@ -340,7 +372,14 @@ def resolve_case(name, flats):
     return new_name
 
 
-def move(name_s, name_d, flats_s, flats_d):
+def safe_copy(name_s, name_d, flats_s, flats_d):
+    nn = resolve_case(name_s, flats_d)
+    copy(name_s, nn, flats_s, flats_d)
+    nn = balance_names(name_s, nn, t_lcl, t_rmt)
+    t_rmt[1].update(nn, 'null', 0)
+
+
+def safe_move(name_s, name_d, flats_s, flats_d):
     '''Move source to dest'''
     global counter
     counter += 1
@@ -356,55 +395,48 @@ def move(name_s, name_d, flats_s, flats_d):
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) +
-              ylw(' Move: ') + source + cyn(' to: ') + dest)
+              mgt(' Move: ') + source + mgt(' to: ') + dest)
         logging.info('MOVE: %s TO %s', source, dest)
         subprocess.run(['rclone', 'moveto', source, dest])
     else:
-        print(ylw('Move: ') + source + cyn(' to: ') + dest)
+        print(mgt('Move: ') + source + mgt(' to: ') + dest)
 
-    if name_d == new_name_d:
-        flats_d[1].update(new_name_d, 'null', 0)
+    flats_d[1].update(new_name_d, 'null', 0)
 
     return new_name_d
 
 
-def push(name_s, name_d, flats_s, flats_d):
-    '''Copy source (at local) to dest (at remote)'''
+def copy(name_s, name_d, flats_s, flats_d):
+    global counter
+    counter += 1
+
     source = flats_s[0].path + name_s
     dest = flats_d[0].path + name_d
 
-    global counter, LOG
-    counter += 1
-
     if not dry_run:
-        print('%d/%d' % (counter, total_jobs) + cyn(' Push: ') + source)
-        logging.info('PUSH: %s', source)
+        print('%d/%d' % (counter, total_jobs) +
+              cyn(' Copy: ') + source + cyn(' to: ') + dest)
+        logging.info('COPY: %s TO %s', source, dest)
         subprocess.run(['rclone', 'copyto', source, dest])
     else:
-        print(cyn("Push: ") + source)
+        print(cyn(' Copy: ') + source + cyn(' to: ') + dest)
+
+
+def push(name_s, name_d, flats_s, flats_d):
+    '''Copy source (at local) to dest (at remote)'''
+    copy(name_s, name_d, flats_s, flats_d)
 
 
 def pull(name_s, name_d, flats_s, flats_d):
     '''Copy source (at remote) to dest (at local)'''
-    dest = flats_s[0].path + name_s
-    source = flats_d[0].path + name_d
-
-    global counter, LOG
-    counter += 1
-
-    if not dry_run:
-        print('%d/%d' % (counter, total_jobs) + mgt(' Pull: ') + source)
-        logging.info('PULL: %s', source)
-        subprocess.run(['rclone', 'copyto', source, dest])
-    else:
-        print(mgt("Pull: ") + source)
+    copy(name_d, name_s, flats_d, flats_s)
 
 
 def conflict(name_s, name_d, flats_s, flats_d):
     '''Rename and copy conflicts both ways'''
 
     #
-    # NEEDS FIXING WITH NEW SAFE MOVE API
+    # NEEDS FIXING WITH NEW SAFE MOVE / PUSH API
     #
 
     print(red('Conflict: ') + source)
@@ -412,8 +444,8 @@ def conflict(name_s, name_d, flats_s, flats_d):
     if not dry_run:
         logging.warning('CONFLICT: %s', source)
 
-    move(source, prepend(source, 'lcl_'))
-    move(dest, prepend(dest, 'rmt_'))
+    safe_move(source, prepend(source, 'lcl_'))
+    safe_move(dest, prepend(dest, 'rmt_'))
 
     push(prepend(source, 'lcl_'), prepend(dest, 'lcl_'))
     pull(prepend(source, 'rmt_'), prepend(dest, 'rmt_'))
