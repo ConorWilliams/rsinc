@@ -24,6 +24,13 @@ UPDATED = 1
 DELETED = 2
 CREATED = 3
 
+SAME = 0
+MOVED = 1
+CLONE = 2
+NOT = 3
+MOVED_N = 4  # MOVED name trace
+MOVED_U = 5  # MOVED uid trace
+
 # ****************************************************************************
 # *                                  Classes                                 *
 # ****************************************************************************
@@ -149,42 +156,6 @@ def calc_states(old, new):
             new.update(name, uid, file.time, DELETED)
 
 
-def r_sync(lcl, rmt):
-    '''Recovery sync function'''
-    t_rmt = [rmt, Flat('new_rmt')]  # For all names in rmt
-    t_lcl = [lcl, Flat('new_lcl')]  # For all names in lcl
-
-    for name, file in lcl.names.items():
-        if name in rmt.names:
-            if file.uid != rmt.names[name].uid:
-                if file.time > rmt.names[name].time:
-                    push(lcl.path + name, rmt.path + name)
-                else:
-                    pull(lcl.path + name, rmt.path + name)
-
-        elif file.uid in rmt.uids and not file.is_clone and not rmt.uids[uid].is_clone:
-            if file.time > rmt.uids[file.uid].time:
-                nn = move(rmt.uids[file.uid].name, name, t_rmt, t_rmt)
-                nn = balance_names(name, nn, t_lcl, t_rmt)
-            else:
-                name = rename(lcl.path, name, [pulled, lcl])
-                move(lcl.path + name, lcl.path + rmt.uids[file.uid].name)
-                pulled.update(name, file.uid, file.time)
-        else:
-            name = rename(lcl.path, name, [rmt, pushed])
-            push(lcl.path + name, rmt.path + name)
-            pushed.update(name, file.uid, file.time)
-
-    for name, file in rmt.names.items():
-        if name not in lcl.names and \
-                (file.uid not in lcl.uids or file.is_clone or
-                 (file.uid in lcl.uids and lcl.uids[file.uid].is_clone)):
-
-            name = rename(rmt.path, name, [lcl, pulled])
-            pull(lcl.path + name, rmt.path + name)
-            pulled.update(name, file.uid, file.time)
-
-
 def sync(old, lcl, rmt):
     t_rmt = [rmt, Flat('new_rmt')]  # For all names in rmt
     t_lcl = [lcl, Flat('new_lcl')]  # For all names in lcl
@@ -196,12 +167,86 @@ def sync(old, lcl, rmt):
     rmt.clean()
 
 
-SAME = 0
-MOVED = 1
-CLONE = 2
-NOT = 3
-MOVED_N = 4  # MOVED name trace
-MOVED_U = 5  # MOVED uid trace
+def _sync(old, lcl, rmt, t_lcl, t_rmt):
+    '''Normal sync function'''
+    do_logic = [(SAME, SAME), (SAME, CLONE), (CLONE, SAME), (CLONE, CLONE)]
+    do_cnflct = [(MOVED, SAME), (MOVED, CLONE), (CLONE, MOVED)]
+
+    for name, file in sorted(lcl.names.items()):
+        if file.synced:
+            continue
+
+        s = calc_mv_state(file, rmt)
+
+        if s == (MOVED, SAME) and rmt.names[name].state == DELETED:
+            s = (MOVED, NOT)
+
+        if s in do_logic:
+            rmt.names[name].synced = True
+            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
+
+        elif s in do_cnflct:
+            rmt.names[name].synced = True
+            conflict(name, name, t_lcl, t_rmt)
+
+        elif s == (MOVED, MOVED):
+            rmt.names[name].synced = True
+            if file.uid != rmt.names[name].uid:
+                conflict(name, name, t_lcl, t_rmt)
+
+        elif s == (SAME, MOVED):
+            if file.state == DELETED:
+                continue
+            else:
+                rmt.names[name].synced = True
+                conflict(name, name, t_lcl, t_rmt)
+
+        elif s == (CLONE, NOT):
+            safe_copy(name, name, t_lcl, t_rmt)
+
+        elif s == (SAME, NOT):
+            if file.state == DELETED:
+                # will hit MOVED:x in next pass if moved in rmt
+                continue
+
+            t, f_rmt = trace_rmt(file, old, rmt)
+
+            if t == MOVED_U:
+                f_rmt.synced = True
+                nn = safe_move(name, f_rmt.name, t_lcl, t_lcl)
+                nn = balance_names(nn, f_rmt.name, t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+
+            elif t == CLONE or NOT:
+                safe_copy(name, name, t_lcl, t_rmt)
+            else:
+                logging.error(
+                    'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
+
+        elif s == (MOVED, NOT):
+            t, f_rmt = trace_rmt(file, old, rmt)
+
+            if t == SAME:
+                f_rmt.synced = True
+                nn = safe_move(f_rmt.name, name, t_rmt, t_rmt)
+                nn = balance_names(name, nn, t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+
+            elif t == MOVED_U:
+                f_rmt.synced = True
+                nn = safe_move(name, f_rmt.name, t_lcl, t_lcl)
+                nn = balance_names(nn, f_rmt.name, t_lcl, t_rmt)
+                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
+
+            elif t == MOVED_N or CLONE or NOT:
+                safe_copy(name, name, t_lcl, t_rmt)
+
+            else:
+                logging.error(
+                    'Fell off M:N switch in _sync, t = %s, name = %s', t, name)
+        else:
+            logging.error('Fell off switch in _sync, s = (%d,%d), name = %s',
+                          s[0], s[1], name)
 
 
 def calc_mv_state(file, rmt):
@@ -268,90 +313,11 @@ def trace_rmt(file, old, rmt):
     return trace, rmt_file
 
 
-def _sync(old, lcl, rmt, t_lcl, t_rmt):
-    '''Normal sync function'''
-    do_logic = [(SAME, SAME), (SAME, CLONE), (CLONE, SAME), (CLONE, CLONE)]
-    do_cnflct = [(MOVED, SAME), (MOVED, CLONE), (CLONE, MOVED)]
-
-    for name, file in sorted(lcl.names.items()):
-        if file.synced:
-            continue
-
-        s = calc_mv_state(file, rmt)
-
-        if s == (MOVED, SAME) and rmt.names[name].state == DELETED:
-            s = (MOVED, NOT)
-
-        if s in do_logic:
-            rmt.names[name].synced = True
-            LOGIC[file.state][rmt.names[name].state](name, name, t_lcl, t_rmt)
-
-        elif s in do_cnflct:
-            rmt.names[name].synced = True
-            conflict(name, name, t_lcl, t_rmt)
-
-        elif s == (MOVED, MOVED):
-            rmt.names[name].synced = True
-            if file.uid != rmt.names[name].uid:
-                conflict(name, name, t_lcl, t_rmt)
-
-        elif s == (CLONE, NOT):
-            safe_push(name, t_lcl, t_rmt)
-
-        elif s == (SAME, MOVED):
-            if file.state == DELETED:
-                continue
-            else:
-                rmt.names[name].synced = True
-                conflict(name, name, t_lcl, t_rmt)
-
-        elif s == (SAME, NOT):
-            if file.state == DELETED:
-                # will hit MOVED:x in next pass if moved in rmt
-                continue
-
-            t, f_rmt = trace_rmt(file, old, rmt)
-
-            if t == MOVED_U:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, t_lcl, t_lcl)
-                nn = balance_names(nn, f_rmt.name, t_lcl, t_rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
-            elif t == CLONE or NOT:
-                safe_push(name, t_lcl, t_rmt)
-            else:
-                logging.error(
-                    'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
-
-        elif s == (MOVED, NOT):
-            t, f_rmt = trace_rmt(file, old, rmt)
-
-            if t == SAME:
-                f_rmt.synced = True
-                nn = safe_move(f_rmt.name, name, t_rmt, t_rmt)
-                nn = balance_names(name, nn, t_lcl, t_rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
-            elif t == MOVED_U:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, t_lcl, t_lcl)
-                nn = balance_names(nn, f_rmt.name, t_lcl, t_rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
-            elif t == MOVED_N or CLONE or NOT:
-                safe_push(name, t_lcl, t_rmt)
-            else:
-                logging.error(
-                    'Fell off M:N switch in _sync, t = %s, name = %s', t, name)
-        else:
-            logging.error('Fell off switch in _sync, s = (%d,%d), name = %s',
-                          s[0], s[1], name)
-
-
-def null(*args):
-    return
-
-
 def balance_names(name_lcl, name_rmt, flats_lcl, flats_rmt):
-    '''Used to match names when a move and rename generates a case conflict'''
+    '''
+    Used to match names when a case conflict rename generates name 
+    differences between local and remote
+    '''
     nn_lcl = name_lcl
     nn_rmt = name_rmt
 
@@ -389,8 +355,8 @@ def resolve_case(name, flats):
 def safe_copy(name_s, name_d, flats_s, flats_d):
     nn = resolve_case(name_s, flats_d)
     copy(name_s, nn, flats_s, flats_d)
-    nn = balance_names(name_s, nn, t_lcl, t_rmt)
-    t_rmt[1].update(nn, 'null', 0)
+    nn = balance_names(name_s, nn, flats_s, flats_d)
+    flats_d[1].update(nn, 'null', 0)
 
 
 def safe_move(name_s, name_d, flats_s, flats_d):
@@ -443,10 +409,10 @@ def pull(name_s, name_d, flats_s, flats_d):
 
 def conflict(name_s, name_d, flats_s, flats_d):
     '''Rename and copy conflicts both ways'''
-    print(red('Conflict: ') + source)
+    print(red('Conflict: ') + name_s)
 
     if not dry_run:
-        logging.warning('CONFLICT: %s', source)
+        logging.warning('CONFLICT: %s', name_s)
 
     nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flats_s, flats_s)
     nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flats_d, flats_d)
@@ -473,6 +439,10 @@ def delL(name_s, name_d, flats_s, flats_d):
 def delR(name_s, name_d, flats_s, flats_d):
     '''Delete remote (at remote)'''
     delL(name_d, name_s, flats_d, flats_s)
+
+
+def null(*args):
+    return
 
 
 # ****************************************************************************
@@ -613,7 +583,7 @@ grn = colored.green    # info
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 LOGIC = [[null, pull, delL, conflict],
-         [push, conflict, copy, conflict],
+         [copy, conflict, copy, conflict],
          [delR, pull, null, pull],
          [conflict, conflict, copy, conflict], ]
 
@@ -729,6 +699,9 @@ for folder in folders:
     # First run & recover mode
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
+
+        calc_states(lcl, lcl)
+        calc_states(lcl, rmt)
     else:
         print('Reading last state.')
         branch = get_branch(master, folder)
