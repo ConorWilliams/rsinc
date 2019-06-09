@@ -699,9 +699,6 @@ for folder in folders:
     # First run & recover mode
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
-
-        calc_states(lcl, lcl)
-        calc_states(lcl, rmt)
     else:
         print('Reading last state.')
         branch = get_branch(master, folder)
