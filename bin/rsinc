@@ -15,11 +15,10 @@ import subprocess
 import ujson as json
 import logging
 from datetime import datetime
+
 import halo
 from clint.textui import colored
 
-import sys
-sys.path.append('../rsinc/')
 import rsinc
 
 CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config
@@ -300,6 +299,7 @@ for folder in folders:
     # First run & recover mode
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
+        save = True
     else:
         print('Reading last state.')
         branch = get_branch(master, folder)
@@ -312,7 +312,7 @@ for folder in folders:
     dry_run = True
 
     print(grn('Dry pass:'))
-    count = rsinc.sync(old, lcl, rmt, recover, dry_run)
+    count = rsinc.sync(old, lcl, rmt, recover, dry_run, case=CASE_INSENSATIVE)
 
     dry_run = args.dry
 
@@ -326,7 +326,8 @@ for folder in folders:
             save = True
 
             write(TEMP_FILE, {'folder': folder})
-            sync(old, lcl, rmt, recover, dry_run, count)
+            rsinc.sync(old, lcl, rmt, recover, dry_run,
+                       total=count, case=CASE_INSENSATIVE)
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(min_path))
@@ -340,7 +341,7 @@ for folder in folders:
     if save:
         spin.start(grn('Saving: ') + qt(min_path))
 
-        merge(master, min_path, pack(lsl(BASE_L + min_path), HASH_NAME))
+        merge(master, min_path, pack(rsinc.lsl(BASE_L + min_path, HASH_NAME)))
         write(MASTER, master)
 
         if os.path.exists(TEMP_FILE):

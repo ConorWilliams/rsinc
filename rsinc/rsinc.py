@@ -72,16 +72,17 @@ class Flat(_Flat):
             file.synced = False
 
 
-class Counter():
+class Struct():
     def __init__(self):
         self.count = 0
         self.total = 0
         self.lcl = None
         self.rmt = None
         self.dry = True
+        self.case = True
 
 
-track = Counter()  # global used to track how many operations sync needs
+track = Struct()  # global used to track how many operations sync needs
 
 # ****************************************************************************
 # *                                 Functions                                *
@@ -149,13 +150,14 @@ def calc_states(old, new):
             new.update(name, uid, file.time, DELETED)
 
 
-def sync(old, lcl, rmt, recover=False, dry_run=True, total=0):
+def sync(old, lcl, rmt, recover=False, dry_run=True, total=0, case=True):
     global track
 
     track.lcl = lcl.path
     track.rmt = rmt.path
     track.total = total
     track.dry = dry_run
+    track.case = case
     track.count = 0
 
     if recover:
@@ -364,7 +366,9 @@ def resolve_case(name, flat):
     'flat_d'. If it does name is modified until no case conflicts occur and the 
     new name returned
     '''
-    if not CASE_INSENSATIVE:
+    global track
+
+    if not track.case:
         return name_d
 
     new_name = name
@@ -417,7 +421,7 @@ def push(name_s, name_d, flat_s, flat_d):
         text = 'Push'
         col = mgt
 
-    elif flat_s.path == bas_rmt and flat_d.path == track.lcl:
+    elif flat_s.path == track.rmt and flat_d.path == track.lcl:
         text = 'Pull'
         col = cyn
 
