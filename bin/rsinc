@@ -668,13 +668,13 @@ if args.purge:
 
 # get the master structure
 if not os.path.exists(MASTER):
-    print(ylw('WARN'), '"master.json" missing, this must be your first run')
+    print(ylw('WARN'), MASTER, 'missing, this must be your first run')
     write(MASTER, empty())
 
 master = read(MASTER)
 
 if os.path.exists(TEMP_FILE):
-    print(red('ERROR') + ', detected a crash, found rsinc.tmp')
+    print(red('ERROR') + ', detected a crash, found', TEMP_FILE)
 
     corrupt = read(TEMP_FILE)['folder']
     if corrupt in folders:
