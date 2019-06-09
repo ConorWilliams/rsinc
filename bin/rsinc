@@ -23,10 +23,10 @@ UPDATED = 1
 DELETED = 2
 CREATED = 3
 
-SAME = 0
+NOMOVE = 0
 MOVED = 1
 CLONE = 2
-NOT = 3
+NOTHERE = 3
 MOVED_N = 4  # MOVED name trace
 MOVED_U = 5  # MOVED uid trace
 
@@ -161,22 +161,40 @@ def calc_states(old, new):
             new.update(name, uid, file.time, DELETED)
 
 
-def recover(lcl, rmt):
-    pass
-
-
 def sync(old, lcl, rmt):
-    _sync(old, lcl, rmt)
-    _sync(old, rmt, lcl)
+    global recover
+
+    if recover:
+        _recover(lcl, rmt)
+        _recover(rmt, lcl)
+    else:
+        _sync(old, lcl, rmt)
+        _sync(old, rmt, lcl)
 
     lcl.clean()
     rmt.clean()
 
 
+def _recover(lcl, rmt):
+    for name, file in sorted(lcl.names.items()):
+        if file.synced:
+            continue
+        elif name in rmt.names:
+            if file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    push(name, name, lcl, rmt)
+                else:
+                    pull(name, name, lcl, rmt)
+            rmt.names[name].synced = True
+        else:
+            safe_push(name, name, lcl, rmt)
+
+
 def _sync(old, lcl, rmt):
     '''Normal sync function'''
-    do_logic = [(SAME, SAME), (SAME, CLONE), (CLONE, SAME), (CLONE, CLONE)]
-    do_cnflct = [(MOVED, SAME), (MOVED, CLONE), (CLONE, MOVED)]
+    do_logic = [(NOMOVE, NOMOVE), (NOMOVE, CLONE),
+                (CLONE, NOMOVE), (CLONE, CLONE)]
+    do_cnflct = [(MOVED, NOMOVE), (MOVED, CLONE), (CLONE, MOVED)]
 
     for name, file in sorted(lcl.names.items()):
         if file.synced:
@@ -184,8 +202,8 @@ def _sync(old, lcl, rmt):
 
         s = calc_mv_state(file, rmt)
 
-        if s == (MOVED, SAME) and rmt.names[name].state == DELETED:
-            s = (MOVED, NOT)
+        if s == (MOVED, NOMOVE) and rmt.names[name].state == DELETED:
+            s = (MOVED, NOTHERE)
 
         if s in do_logic:
             rmt.names[name].synced = True
@@ -200,17 +218,17 @@ def _sync(old, lcl, rmt):
             if file.uid != rmt.names[name].uid:
                 conflict(name, name, lcl, rmt)
 
-        elif s == (SAME, MOVED):
+        elif s == (NOMOVE, MOVED):
             if file.state == DELETED:
                 continue
             else:
                 rmt.names[name].synced = True
                 conflict(name, name, lcl, rmt)
 
-        elif s == (CLONE, NOT):
+        elif s == (CLONE, NOTHERE):
             safe_push(name, name, lcl, rmt)
 
-        elif s == (SAME, NOT):
+        elif s == (NOMOVE, NOTHERE):
             if file.state == DELETED:
                 # will hit MOVED:x in next pass if moved in rmt
                 continue
@@ -223,16 +241,16 @@ def _sync(old, lcl, rmt):
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
-            elif t == CLONE or NOT:
+            elif t == CLONE or NOTHERE:
                 safe_push(name, name, lcl, rmt)
             else:
                 logging.error(
                     'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
 
-        elif s == (MOVED, NOT):
+        elif s == (MOVED, NOTHERE):
             t, f_rmt = trace_rmt(file, old, rmt)
 
-            if t == SAME:
+            if t == NOMOVE:
                 f_rmt.synced = True
                 nn = safe_move(f_rmt.name, name, rmt)
                 nn = balance_names(name, nn, lcl, rmt)
@@ -244,7 +262,7 @@ def _sync(old, lcl, rmt):
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
-            elif t == MOVED_N or CLONE or NOT:
+            elif t == MOVED_N or CLONE or NOTHERE:
                 safe_push(name, name, lcl, rmt)
 
             else:
@@ -260,21 +278,21 @@ def calc_mv_state(file, rmt):
         if file.state == CREATED:
             i = CLONE
         else:
-            i = SAME
+            i = NOMOVE
     elif file.moved:
         i = MOVED
     else:
-        i = SAME
+        i = NOMOVE
 
     if file.name not in rmt.names:
-        j = NOT
+        j = NOTHERE
     else:
         if rmt.names[file.name].is_clone:
             j = CLONE
         elif rmt.names[file.name].moved:
             j = MOVED
         else:
-            j = SAME
+            j = NOMOVE
 
     return (i, j)
 
@@ -299,11 +317,11 @@ def trace_rmt(file, old, rmt):
             if mt.names[old_file.name].state == CREATED:
                 trace = CLONE
             else:
-                trace = SAME
+                trace = NOMOVE
         elif rmt.names[old_file.name].moved:
             trace = MOVED_N
         else:
-            trace = SAME
+            trace = NOMOVE
     elif old_file.uid in rmt.uids:
         rmt_file = rmt.uids[old_file.uid]
 
@@ -312,9 +330,9 @@ def trace_rmt(file, old, rmt):
         elif rmt.uids[old_file.uid].moved:
             trace = MOVED_U
         else:
-            trace = SAME
+            trace = NOMOVE
     else:
-        trace = NOT
+        trace = NOTHERE
 
     return trace, rmt_file
 
