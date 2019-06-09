@@ -46,7 +46,7 @@ class File():
         self.synced = False
 
 
-class Flat():
+class _Flat():
     def __init__(self, path):
         self.path = path
         self.files = []
@@ -65,14 +65,20 @@ class Flat():
         else:
             self.uids.update({uid: self.files[-1]})
 
+
+class Flat(_Flat):
+    def __init__(self, path):
+        _Flat.__init__(self, path)
+        self.tmp = _Flat(path)
+
     def clean(self):
+        self.tmp = _Flat(self.path)
         for file in self.files:
             file.synced = False
 
-
-# ****************************************************************************
-# *                                 Functions                                *
-# ****************************************************************************
+    # ****************************************************************************
+    # *                                 Functions                                *
+    # ****************************************************************************
 
 
 def qt(string):
@@ -172,9 +178,7 @@ def _sync(old, lcl, rmt):
     do_logic = [(SAME, SAME), (SAME, CLONE), (CLONE, SAME), (CLONE, CLONE)]
     do_cnflct = [(MOVED, SAME), (MOVED, CLONE), (CLONE, MOVED)]
 
-    for name in sorted(set(lcl.names.keys())):
-        file = lcl.names[name]
-
+    for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
 
@@ -215,7 +219,7 @@ def _sync(old, lcl, rmt):
 
             if t == MOVED_U:
                 f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl.path)
+                nn = safe_move(name, f_rmt.name, lcl)
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
@@ -230,13 +234,13 @@ def _sync(old, lcl, rmt):
 
             if t == SAME:
                 f_rmt.synced = True
-                nn = safe_move(f_rmt.name, name, rmt.path)
+                nn = safe_move(f_rmt.name, name, rmt)
                 nn = balance_names(name, nn, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
             elif t == MOVED_U:
                 f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl.path)
+                nn = safe_move(name, f_rmt.name, lcl)
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
@@ -324,14 +328,18 @@ def balance_names(name_lcl, name_rmt, lcl, rmt):
     nn_rmt = name_rmt
 
     while nn_lcl != nn_rmt:
-        nn_lcl = nn_rmt
+        if len(nn_lcl) > len(nn_rmt):
+            nn_rmt = nn_lcl
+        else:
+            nn_lcl = nn_rmt
+
         resolve_case(nn_lcl, lcl)
         resolve_case(nn_rmt, rmt)
 
     if nn_lcl != name_lcl:
-        safe_move(name_lcl, nn_lcl, lcl.path)
+        safe_move(name_lcl, nn_lcl, lcl)
     if nn_rmt != name_rmt:
-        safe_move(name_rmt, nn_rmt, rmt.path)
+        safe_move(name_rmt, nn_rmt, rmt)
 
     return nn_lcl
 
@@ -347,7 +355,7 @@ def resolve_case(name, flat):
 
     new_name = name
 
-    while new_name.lower() in flat.lower:
+    while new_name.lower() in flat.lower or new_name.lower() in flat.tmp.lower:
         new_name = prepend(new_name, '_')
 
     return new_name
@@ -357,35 +365,34 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     nn = resolve_case(name_s, flat_d)
     push(name_s, nn, flat_s, flat_d)
     nn = balance_names(name_s, nn, flat_s, flat_d)
-    flat_d.update(nn, 'null', 0)
-    flat_d.names[nn].synced = True
+    flat_d.tmp.update(nn, 'null', 0)
 
 
-def safe_move(name_s, name_d, base):
+def safe_move(name_s, name_d, flat):
     '''Move source to dest'''
     global counter, total_jobs, path_lcl, path_rmt
     counter += 1
 
-    nn_d = resolve_case(name_d, flat_d)
+    nn_d = resolve_case(name_d, flat)
+    base = flat.path
 
-    if base == bas_lcl:
+    if base == path_lcl:
         col = cyn
-    elif base == bas_rmt:
+    elif base == path_rmt:
         col = mgt
 
-    info = col('Move: ') + '(%s)' % base + name_s + col(' to: ') + nn_d
+    info = col('Move') + '(%s): ' % base + name_s + col(' to: ') + nn_d
 
     if not dry_run:
         print('%d/%d' % (counter, total_jobs), info)
-        logging.info('MOVE: () %s TO %s', base, name_s, nn_d)
-        subprocess.run(['rclone', 'moveto', base + name_s, base + name_d])
+        logging.info('MOVE(%s): %s TO %s', base, name_s, nn_d)
+        subprocess.run(['rclone', 'moveto', base + name_s, base + nn_d])
     else:
         print(info)
 
-    flat.update(nn_d, 'null', 0)
-    flat.names[nn_d].synced = True
+    flat.tmp.update(nn_d, 'null', 0)
 
-    return new_name_d
+    return nn_d
 
 
 def push(name_s, name_d, flat_s, flat_d):
@@ -403,10 +410,10 @@ def push(name_s, name_d, flat_s, flat_d):
     if not dry_run:
         print('%d/%d' % (counter, total_jobs) + col(' %s: ' % text) + name_d)
         logging.info('%s: %s', text.upper(), name_d)
-        cmd = 'rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d
-        subprocess.run([cmd])
+        cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
+        subprocess.run(cmd)
     else:
-        print(cyn('%s: ' % text) + name_d)
+        print(col('%s: ' % text) + name_d)
 
 
 def pull(name_s, name_d, flat_s, flat_d):
@@ -421,8 +428,8 @@ def conflict(name_s, name_d, flat_s, flat_d):
     if not dry_run:
         logging.warning('CONFLICT: %s', name_s)
 
-    nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flat_s.path)
-    nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flat_d.path)
+    nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flat_s)
+    nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flat_d)
 
     safe_push(nn_lcl, nn_lcl, flat_s, flat_d)
     safe_push(nn_rmt, nn_rmt, flat_d, flat_s)
@@ -579,8 +586,6 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
                     action="store_true")
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
-parser.add_argument("-s", "--save", help="Force save state to master",
-                    action="store_true")
 
 args = parser.parse_args()
 
@@ -661,6 +666,7 @@ recover = args.recovery
 # ****************************************************************************
 # *                               Main Program                               *
 # ****************************************************************************
+
 
 if args.purge:
     print(ylw('WARN'), 'Purging history of all folders')
