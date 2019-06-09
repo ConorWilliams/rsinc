@@ -151,9 +151,13 @@ def calc_states(old, new):
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
             uid = file.uid
             while uid in new.uids:
-                # Force unique delete place-holders
+                # Force unique uid for delete place-holders
                 uid += '0'
             new.update(name, uid, file.time, DELETED)
+
+
+def recover(lcl, rmt):
+    pass
 
 
 def sync(old, lcl, rmt):
@@ -202,7 +206,7 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
                 conflict(name, name, t_lcl, t_rmt)
 
         elif s == (CLONE, NOT):
-            safe_copy(name, name, t_lcl, t_rmt)
+            safe_push(name, name, t_lcl, t_rmt)
 
         elif s == (SAME, NOT):
             if file.state == DELETED:
@@ -218,7 +222,7 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
                 LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
 
             elif t == CLONE or NOT:
-                safe_copy(name, name, t_lcl, t_rmt)
+                safe_push(name, name, t_lcl, t_rmt)
             else:
                 logging.error(
                     'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
@@ -239,7 +243,7 @@ def _sync(old, lcl, rmt, t_lcl, t_rmt):
                 LOGIC[file.state][f_rmt.state](nn, nn, t_lcl, t_rmt)
 
             elif t == MOVED_N or CLONE or NOT:
-                safe_copy(name, name, t_lcl, t_rmt)
+                safe_push(name, name, t_lcl, t_rmt)
 
             else:
                 logging.error(
@@ -352,59 +356,64 @@ def resolve_case(name, flats):
     return new_name
 
 
-def safe_copy(name_s, name_d, flats_s, flats_d):
+def safe_push(name_s, name_d, flats_s, flats_d):
     nn = resolve_case(name_s, flats_d)
-    copy(name_s, nn, flats_s, flats_d)
+    push(name_s, nn, flats_s, flats_d)
     nn = balance_names(name_s, nn, flats_s, flats_d)
     flats_d[1].update(nn, 'null', 0)
 
 
 def safe_move(name_s, name_d, flats_s, flats_d):
     '''Move source to dest'''
-    global counter
+    global counter, total_jobs, base_lcl, base_rmt
     counter += 1
 
-    for flat in flats_d:
-        if name_d in flat.names:
-            print(red('ERROR:'), name_d, 'in', flats_d[0].path)
+    nn_d = resolve_case(name_d, flats_d)
 
-    new_name_d = resolve_case(name_d, flats_d)
+    if flats_s[0].path == bas_lcl and flats_d[0].path == base_lcl:
+        col = cyn
 
-    source = flats_s[0].path + name_s
-    dest = flats_d[0].path + new_name_d
+    elif flats_s[0].path == bas_rmt and flats_d[0].path == base_rmt:
+        col = mgt
 
     if not dry_run:
-        print('%d/%d' % (counter, total_jobs) +
-              mgt(' Move: ') + source + mgt(' to: ') + dest)
-        logging.info('MOVE: %s TO %s', source, dest)
-        subprocess.run(['rclone', 'moveto', source, dest])
+        print('%d/%d' % (counter, total_jobs) + col(' Move: ') + '(%s)' %
+              flats_s[0].path + name_s + col(' to: ') + nn_d)
+        logging.info('MOVE: () %s TO %s', base_s, name_s, nn_d)
+        subprocess.run(['rclone', 'moveto', flats_s[0].path + name_s, flats_d[0].path name_d])
     else:
-        print(mgt('Move: ') + source + mgt(' to: ') + dest)
+        print(col('Move: ') + '(%s)' %
+              flats_s[0].path + name_s + col(' to: ') + nn_d)
 
-    flats_d[1].update(new_name_d, 'null', 0)
+    flats_d[1].update(nn_d, 'null', 0)
 
     return new_name_d
 
 
 def copy(name_s, name_d, flats_s, flats_d):
-    global counter
+    global counter, total_jobs, base_lcl, base_rmt
     counter += 1
 
-    source = flats_s[0].path + name_s
-    dest = flats_d[0].path + name_d
+    if flats_s[0].path == base_lcl and flats_d[0].path == base_rmt:
+        text = 'Push'
+        col = mgt
+
+    elif flats_s[0].path == bas_rmt and flats_d[0].path == base_lcl:
+        text = 'Pull'
+        col = cyn
 
     if not dry_run:
-        print('%d/%d' % (counter, total_jobs) +
-              cyn(' Copy: ') + source + cyn(' to: ') + dest)
-        logging.info('COPY: %s TO %s', source, dest)
-        subprocess.run(['rclone', 'copyto', source, dest])
+        print('%d/%d' % (counter, total_jobs) + col(' %s: ' % text) + name_d)
+        logging.info('%s: %s TO %s', text.upper(), name_s, name_d)
+        subprocess.run(['rclone', 'copyto', flats_s[0].path +
+                        name_s, flats_d[0].path + name_d])
     else:
-        print(cyn('Copy: ') + source + cyn(' to: ') + dest)
+        print(cyn('%s: ' % text) + name_d)
 
 
 def pull(name_s, name_d, flats_s, flats_d):
     '''Copy source (at remote) to dest (at local)'''
-    copy(name_d, name_s, flats_d, flats_s)
+    push(name_d, name_s, flats_d, flats_s)
 
 
 def conflict(name_s, name_d, flats_s, flats_d):
@@ -417,8 +426,8 @@ def conflict(name_s, name_d, flats_s, flats_d):
     nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flats_s, flats_s)
     nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flats_d, flats_d)
 
-    safe_copy(nn_lcl, nn_lcl, flats_s, flats_d)
-    safe_copy(nn_rmt, nn_rmt, flats_d, flats_s)
+    safe_push(nn_lcl, nn_lcl, flats_s, flats_d)
+    safe_push(nn_rmt, nn_rmt, flats_d, flats_s)
 
 
 def delL(name_s, name_d, flats_s, flats_d):
@@ -583,9 +592,9 @@ grn = colored.green    # info
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 LOGIC = [[null, pull, delL, conflict],
-         [copy, conflict, copy, conflict],
+         [push, conflict, push, conflict],
          [delR, pull, null, pull],
-         [conflict, conflict, copy, conflict], ]
+         [conflict, conflict, push, conflict], ]
 
 # Decide which folder(s) to sync
 CWD = os.getcwd()
