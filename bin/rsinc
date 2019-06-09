@@ -16,8 +16,7 @@ from datetime import datetime
 import halo
 from clint.textui import colored
 
-DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
-DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
+CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config
 
 THESAME = 0
 UPDATED = 1
@@ -560,6 +559,32 @@ def get_min(master, path):
 
 
 # ****************************************************************************
+# *                             Parsing Arguments                            *
+# ****************************************************************************
+
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("folders", help="Folders to sync", nargs='*')
+parser.add_argument("--config",
+                    help="Path to config file (default ~/.rsinc/config.json)")
+parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
+parser.add_argument("-c", "--clean", action="store_true",
+                    help="Clean directories")
+parser.add_argument("-D", "--default", help="Sync defaults",
+                    action="store_true")
+parser.add_argument("-r", "--recovery", action="store_true",
+                    help="Enter recovery mode")
+parser.add_argument("-a", "--auto", help="Don't ask permissions",
+                    action="store_true")
+parser.add_argument("-p", "--purge", help="Reset history for all folders",
+                    action="store_true")
+parser.add_argument("-s", "--save", help="Force save state to master",
+                    action="store_true")
+
+args = parser.parse_args()
+
+# ****************************************************************************
 # *                           Definitions / Set-up                           *
 # ****************************************************************************
 
@@ -568,13 +593,19 @@ print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
 
-config = read(DRIVE_DIR + 'config.json')
+if args.config == None:
+    config = read(CONFIG_FILE)
+else:
+    config = read(args.config)
 
 BASE_R = config['BASE_R']
 BASE_L = config['BASE_L']
 CASE_INSENSATIVE = config['CASE_INSENSATIVE']
 HASH_NAME = config['HASH_NAME']
 DEFAULT_DIRS = config['DEFAULT_DIRS']
+MASTER = config['MASTER']
+LOG_FOLDER = config['LOG_FOLDER']
+TEMP_FILE = config['TEMP_FILE']
 
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
@@ -611,34 +642,9 @@ else:
         cwd = ['/'.join(cwd)]
 
 # Set up logging
-log_file = DRIVE_DIR + 'logs/' + datetime.now().strftime('%Y-%m-%d')
+log_file = LOG_FOLDER + datetime.now().strftime('%Y-%m-%d')
 logging.basicConfig(filename=log_file, level=logging.DEBUG, datefmt='%H:%M:%S',
                     format='%(asctime)s %(levelname)s: %(message)s')
-
-
-# ****************************************************************************
-# *                             Parsing Arguments                            *
-# ****************************************************************************
-
-
-parser = argparse.ArgumentParser()
-
-parser.add_argument("folders", help="Folders to sync", nargs='*')
-parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
-parser.add_argument("-c", "--clean", action="store_true",
-                    help="Clean directories")
-parser.add_argument("-D", "--default", help="Sync defaults",
-                    action="store_true")
-parser.add_argument("-r", "--recovery", action="store_true",
-                    help="Enter recovery mode")
-parser.add_argument("-a", "--auto", help="Don't ask permissions",
-                    action="store_true")
-parser.add_argument("-p", "--purge", help="Reset history for all folders",
-                    action="store_true")
-parser.add_argument("-s", "--save", help="Force save state to master",
-                    action="store_true")
-
-args = parser.parse_args()
 
 if args.default:
     folders = DEFAULT_DIRS
@@ -658,19 +664,19 @@ recover = args.recovery
 
 if args.purge:
     print(ylw('WARN'), 'Purging history of all folders')
-    write(DRIVE_DIR + 'master.json', empty())
+    write(MASTER, empty())
 
 # get the master structure
-if not os.path.exists(DRIVE_DIR + 'master.json'):
+if not os.path.exists(MASTER):
     print(ylw('WARN'), '"master.json" missing, this must be your first run')
-    write(DRIVE_DIR + 'master.json', empty())
+    write(MASTER, empty())
 
-master = read(DRIVE_DIR + 'master.json')
+master = read(MASTER)
 
-if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
+if os.path.exists(TEMP_FILE):
     print(red('ERROR') + ', detected a crash, found rsinc.tmp')
 
-    corrupt = read(DRIVE_DIR + 'rsinc.tmp')['folder']
+    corrupt = read(TEMP_FILE)['folder']
     if corrupt in folders:
         folders.remove(corrupt)
 
@@ -735,7 +741,7 @@ for folder in folders:
             counter = 0
             save = True
 
-            write(DRIVE_DIR + 'rsinc.tmp', {'folder': folder})
+            write('/tmp/rsinc.tmp', {'folder': folder})
             sync(old, lcl, rmt)
 
         if args.clean:
@@ -751,10 +757,10 @@ for folder in folders:
         spin.start(grn('Saving: ') + qt(min_path))
 
         merge(master, min_path, pack(lsl(BASE_L + min_path)))
-        write(DRIVE_DIR + 'master.json', master)
+        write(MASTER, master)
 
-        if os.path.exists(DRIVE_DIR + 'rsinc.tmp'):
-            subprocess.run(["rm", DRIVE_DIR + 'rsinc.tmp'])
+        if os.path.exists(TEMP_FILE):
+            subprocess.run(["rm", TEMP_FILE])
 
         spin.stop_and_persist(symbol='✔')
 

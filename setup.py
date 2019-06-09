@@ -29,14 +29,16 @@ setuptools.setup(
     ],
 )
 
-DRIVE_DIR = '~/.rsinc/'  # Where config and data files live
-DRIVE_DIR = os.path.expanduser(DRIVE_DIR)
+DRIVE_DIR = os.path.expanduser('~/.rsinc/')  # Where config and data files live
 
 defult_config = {'BASE_R': 'onedrive:',
                  'BASE_L': os.path.expanduser('~/'),
                  'CASE_INSENSATIVE': True,
                  'HASH_NAME': 'SHA-1',
-                 "DEFAULT_DIRS": ["cpp", "docs", "cam"], }
+                 'DEFAULT_DIRS': ["cpp", "docs", "cam"],
+                 'LOG_FOLDER': DRIVE_DIR + 'logs/',
+                 'MASTER': DRIVE_DIR + 'config.json',
+                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp'}
 
 if not os.path.exists(DRIVE_DIR):
     subprocess.run(['mkdir', DRIVE_DIR])
