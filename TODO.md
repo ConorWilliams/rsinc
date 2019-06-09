@@ -4,7 +4,7 @@ TODO list:
 - [x] Fix conflict function with new safe move
 - [ ] Rebuild recovery mode
 - [x] function to determine print text push pull etc
-- [ ] Refactor variables in del, push, pull, etc to conform with safe move better
+- [x] Refactor variables in del, push, pull, etc to conform with safe move better
 - [ ] Custom .config file location
 - [ ] Test script
 - [ ] Name fixer so local and remote have same naming schemes
