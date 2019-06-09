@@ -1,3 +1,7 @@
 rsinc/__pycache__/*
+rsinc/__pycache__/
+rsinc/__pycache__
 rsinc.egg-info/*
+rsinc.egg-info/
+rsinc.egg-info
 
