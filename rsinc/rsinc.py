@@ -165,6 +165,8 @@ def sync(old, lcl, rmt, recover=False, dry_run=True, total=0, case=True):
         _recover(lcl, rmt)
         _recover(rmt, lcl)
     else:
+        calc_states(old, lcl)
+        calc_states(old, rmt)
         _sync(old, lcl, rmt)
         _sync(old, rmt, lcl)
 

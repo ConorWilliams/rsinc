@@ -7,6 +7,9 @@ TODO list:
 - [x] Refactor variables in del, push, pull, etc to conform with safe move better
 - [x] Custom .config file location
 - [ ] Redo function comments 
+- [ ] Update readme
+- [ ] Complete readme
+- [ ] Document edge cases
 - [ ] Test script
 - [ ] Name fixer so local and remote have same naming schemes
 - [ ] Windows-port

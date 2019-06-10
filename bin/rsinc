@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# ****************************************************************************
-# *                                 Imports                                  *
-# ****************************************************************************
-
 print('''
 Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
 This is free software with ABSOLUTELY NO WARRANTY''')
@@ -46,11 +42,6 @@ def write(file, d):
     if not dry_run:
         with open(file, 'w') as fp:
             json.dump(d, fp, sort_keys=True, indent=2)
-
-
-# ****************************************************************************
-# *              Functions for working with packed dictionary's              *
-# ****************************************************************************
 
 
 def empty():
@@ -198,7 +189,6 @@ MASTER = config['MASTER']
 LOG_FOLDER = config['LOG_FOLDER']
 TEMP_FILE = config['TEMP_FILE']
 
-
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
@@ -209,7 +199,6 @@ red = colored.red      # error/conflict
 grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
-
 
 # Decide which folder(s) to sync
 CWD = os.getcwd()
@@ -304,9 +293,6 @@ for folder in folders:
         print('Reading last state.')
         branch = get_branch(master, folder)
         unpack(branch, old)
-
-        rsinc.calc_states(old, lcl)
-        rsinc.calc_states(old, rmt)
 
     # Main logic
     dry_run = True
