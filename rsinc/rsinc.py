@@ -24,6 +24,7 @@ NOTHERE = 3
 MOVED_N = 4  # MOVED name trace
 MOVED_U = 5  # MOVED uid trace
 
+log = logging.getLogger(__name__)
 
 # ****************************************************************************
 # *                                  Classes                                 *
@@ -242,7 +243,7 @@ def _sync(old, lcl, rmt):
             elif t == CLONE or NOTHERE:
                 safe_push(name, name, lcl, rmt)
             else:
-                logging.error(
+                log.error(
                     'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
 
         elif s == (MOVED, NOTHERE):
@@ -264,11 +265,11 @@ def _sync(old, lcl, rmt):
                 safe_push(name, name, lcl, rmt)
 
             else:
-                logging.error(
+                log.error(
                     'Fell off M:N switch in _sync, t = %s, name = %s', t, name)
         else:
-            logging.error('Fell off switch in _sync, s = (%d,%d), name = %s',
-                          s[0], s[1], name)
+            log.error('Fell off switch in _sync, s = (%d,%d), name = %s',
+                      s[0], s[1], name)
 
 
 def calc_mv_state(file, rmt):
@@ -403,7 +404,7 @@ def safe_move(name_s, name_d, flat):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        logging.info('MOVE(%s): %s TO %s', base, name_s, nn_d)
+        log.info('MOVE(%s): %s TO %s', base, name_s, nn_d)
         subprocess.run(['rclone', 'moveto', base + name_s, base + nn_d])
     else:
         print(info)
@@ -429,7 +430,7 @@ def push(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        logging.info('%s: %s', text.upper(), name_d)
+        log.info('%s: %s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
         subprocess.run(cmd)
     else:
@@ -448,7 +449,7 @@ def conflict(name_s, name_d, flat_s, flat_d):
     print(red('Conflict: ') + name_s)
 
     if not track.dry:
-        logging.warning('CONFLICT: %s', name_s)
+        log.warning('CONFLICT: %s', name_s)
 
     nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flat_s)
     nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flat_d)
@@ -466,7 +467,7 @@ def delL(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        logging.info('DELETE: %s', flat_s.path + name_s)
+        log.info('DELETE: %s', flat_s.path + name_s)
         subprocess.run(['rclone', 'delete', flat_s.path + name_s])
     else:
         print(info)
