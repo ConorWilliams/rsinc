@@ -194,7 +194,7 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
 
-ylw = colored.yellow   # delete/move
+ylw = colored.yellow   # delete/warn
 red = colored.red      # error/conflict
 grn = colored.green    # info
 
@@ -293,6 +293,9 @@ for folder in folders:
         print('Reading last state.')
         branch = get_branch(master, folder)
         unpack(branch, old)
+
+        rsinc.calc_states(old, lcl)
+        rsinc.calc_states(old, rmt)
 
     # Main logic
     dry_run = True

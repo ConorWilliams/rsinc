@@ -7,6 +7,7 @@ TODO list:
 - [x] Refactor variables in del, push, pull, etc to conform with safe move better
 - [x] Custom .config file location
 - [ ] Redo function comments 
+- [x] Make root folder if lsl fails
 - [ ] Update readme
 - [ ] Complete readme
 - [ ] Document edge cases

@@ -11,6 +11,7 @@ from clint.textui import colored
 
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
+ylw = colored.yellow   # delete
 
 THESAME = 0
 UPDATED = 1
@@ -97,8 +98,8 @@ def lsl(path, hash_name):
     '''
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
+    subprocess.run(['rclone', 'mkdir', path])
     result = subprocess.Popen(command, stdout=subprocess.PIPE)
-
     list_of_dicts = json.load(result.stdout)
 
     out = Flat(path)
@@ -165,8 +166,6 @@ def sync(old, lcl, rmt, recover=False, dry_run=True, total=0, case=True):
         _recover(lcl, rmt)
         _recover(rmt, lcl)
     else:
-        calc_states(old, lcl)
-        calc_states(old, rmt)
         _sync(old, lcl, rmt)
         _sync(old, rmt, lcl)
 
