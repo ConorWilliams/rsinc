@@ -303,7 +303,7 @@ for folder in folders:
     dry_run = True
 
     print(grn('Dry pass:'))
-    count = rsinc.sync(old, lcl, rmt, recover, dry_run, case=CASE_INSENSATIVE)
+    count = rsinc.sync(lcl, rmt, old, recover, dry_run, case=CASE_INSENSATIVE)
 
     dry_run = args.dry
 
@@ -317,7 +317,7 @@ for folder in folders:
             save = True
 
             write(TEMP_FILE, {'folder': folder})
-            rsinc.sync(old, lcl, rmt, recover, dry_run,
+            rsinc.sync(lcl, rmt, old, recover, dry_run,
                        total=count, case=CASE_INSENSATIVE)
 
         if args.clean:

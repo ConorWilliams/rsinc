@@ -152,7 +152,7 @@ def calc_states(old, new):
             new.update(name, uid, file.time, DELETED)
 
 
-def sync(old, lcl, rmt, recover=False, dry_run=True, total=0, case=True):
+def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     global track
 
     track.lcl = lcl.path
