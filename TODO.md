@@ -1,5 +1,4 @@
-TODO list:
-
+Near:
 - [x] Overhaul safe move and clone tracking
 - [x] Fix conflict function with new safe move
 - [x] Rebuild recovery mode
@@ -8,9 +7,15 @@ TODO list:
 - [x] Custom .config file location
 - [ ] Redo function comments 
 - [x] Make root folder if lsl fails
-- [ ] Update readme
-- [ ] Complete readme
+- [x] Update readme
+- [x] Complete readme
 - [ ] Document edge cases
+
+
+Mid:
 - [ ] Test script
+
+
+Far:
 - [ ] Name fixer so local and remote have same naming schemes
 - [ ] Windows-port
