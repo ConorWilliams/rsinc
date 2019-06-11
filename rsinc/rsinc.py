@@ -15,7 +15,7 @@ ylw = colored.yellow   # delete
 red = colored.red      # conflict
 
 THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
-NOMOVE, MOVED, CLONE, NOTHERE, MOVED_N, MOVED_U = tuple(range(6))
+NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4))
 
 log = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ def _sync(old, lcl, rmt):
 
             t, f_rmt = trace_rmt(file, old, rmt)
 
-            if t == MOVED_U:
+            if t == MOVED:
                 f_rmt.synced = True
                 nn = safe_move(name, f_rmt.name, lcl)
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
@@ -269,13 +269,13 @@ def _sync(old, lcl, rmt):
                     nn = balance_names(name, nn, lcl, rmt)
                     LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
-            elif t == MOVED_U:
+            elif t == MOVED:
                 f_rmt.synced = True
                 nn = safe_move(name, f_rmt.name, lcl)
                 nn = balance_names(nn, f_rmt.name, lcl, rmt)
                 LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
-            elif t == MOVED_N or CLONE or NOTHERE:
+            elif t == CLONE or NOTHERE:
                 safe_push(name, name, lcl, rmt)
 
             else:
@@ -334,23 +334,25 @@ def trace_rmt(file, old, rmt):
                 trace = CLONE
             else:
                 trace = NOMOVE
+            return trace, rmt_file
         elif rmt.names[old_file.name].moved:
-            trace = MOVED_N
+            # Do uid trace
+            pass
         else:
-            trace = NOMOVE
-    elif old_file.uid in rmt.uids:
+            return NOMOVE, rmt_file
+
+    if old_file.uid in rmt.uids:
         rmt_file = rmt.uids[old_file.uid]
 
         if rmt.uids[old_file.uid].is_clone:
             trace = CLONE
         elif rmt.uids[old_file.uid].moved:
-            trace = MOVED_U
+            trace = MOVED
         else:
             trace = NOMOVE
+        return trace, rmt_file
     else:
-        trace = NOTHERE
-
-    return trace, rmt_file
+        return NOTHERE, "?"
 
 
 def balance_names(name_lcl, name_rmt, lcl, rmt):
