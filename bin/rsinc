@@ -164,7 +164,8 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
                     action="store_true")
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
-parser.add_argument("--config", help="Path to config file (default ~/.rsinc/config.json)")
+parser.add_argument(
+    "--config", help="Path to config file (default ~/.rsinc/config.json)")
 
 
 args = parser.parse_args()

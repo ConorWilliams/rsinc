@@ -12,6 +12,7 @@ from clint.textui import colored
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
 ylw = colored.yellow   # delete
+red = colored.red      # conflict
 
 THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
 NOMOVE, MOVED, CLONE, NOTHERE, MOVED_N, MOVED_U = tuple(range(6))
@@ -128,7 +129,8 @@ def calc_states(old, new):
                 file.state = UPDATED
             else:
                 file.state = THESAME
-        elif file.uid in old.uids and not file.is_clone:
+        elif file.uid in old.uids and not file.is_clone
+                                  and old.uids[file.uid].name not in new.names:
             file.moved = True
             file.state = THESAME
         else:
@@ -136,6 +138,7 @@ def calc_states(old, new):
 
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
+            # Want all clone-moves to leave delete place holders
             new.update(name, file.uid, file.time, DELETED)
 
 
@@ -187,7 +190,7 @@ def _sync(old, lcl, rmt):
         if file.synced:
             continue
 
-        s = calc_mv_state(file, rmt)
+        s = get_mv_state(file, rmt)
 
         if s == (MOVED, NOMOVE) and rmt.names[name].state == DELETED:
             s = (MOVED, NOTHERE)
@@ -239,7 +242,7 @@ def _sync(old, lcl, rmt):
 
             if t == NOMOVE:
                 f_rmt.synced = True
-                if f_rmt.state = DELETED:
+                if f_rmt.state == DELETED:
                     delL(name, name, lcl, rmt)
                 else:
                     nn = safe_move(f_rmt.name, name, rmt)
@@ -263,7 +266,7 @@ def _sync(old, lcl, rmt):
                       s[0], s[1], name)
 
 
-def calc_mv_state(file, rmt):
+def get_mv_state(file, rmt):
     if file.is_clone:
         if file.state == CREATED:
             i = CLONE
@@ -441,7 +444,9 @@ def conflict(name_s, name_d, flat_s, flat_d):
     '''Rename and copy conflicts both ways'''
     global track
 
-    print(red('Conflict: ') + name_s)
+    print(red('Conflict') + ' %d:%d: %s' % (flat_s.names[name_s].state,
+                                            flat_d.names[name_d].state,
+                                            name_s),)
 
     if not track.dry:
         log.warning('CONFLICT: %s', name_s)
