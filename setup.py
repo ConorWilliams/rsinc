@@ -1,5 +1,9 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+'''
+Rsinc setup script for pip to install rsinc as a package. 
+Additionally sets up the ~/.rsinc folder and default config file.
+'''
 
 import setuptools
 import os

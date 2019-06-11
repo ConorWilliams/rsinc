@@ -127,24 +127,6 @@ def have(master, path):
     return _have(master, path.split('/'))
 
 
-def _get_min(nest, chain, min_chain):
-    '''Returns the subset of chain contained in packed dict, nest'''
-    if len(chain) == 1:
-        return min_chain
-    elif chain[0] not in nest['fold']:
-        return min_chain
-    else:
-        min_chain.append(chain[1])
-        return _get_min(nest['fold'][chain[0]], chain[1:], min_chain)
-
-
-def get_min(master, path):
-    '''Helper function for _get_min, converts path to chain'''
-    chain = path.split('/')
-    min_chain = _get_min(master, chain, [chain[0]])
-    return '/'.join(min_chain)
-
-
 # ****************************************************************************
 # *                             Parsing Arguments                            *
 # ****************************************************************************
@@ -267,8 +249,6 @@ for folder in folders:
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
-    min_path = get_min(master, folder)
-
     # Determine if first run
     if have(master, folder):
         print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
@@ -316,7 +296,7 @@ for folder in folders:
                        total=count, case=CASE_INSENSATIVE)
 
         if args.clean:
-            spin.start(grn('Pruning: ') + qt(min_path))
+            spin.start(grn('Pruning: ') + qt(folder))
 
             subprocess.run(["rclone", 'rmdirs', path_rmt])
             subprocess.run(["rclone", 'rmdirs', path_lcl])
@@ -325,7 +305,7 @@ for folder in folders:
 
     # Merge into master and clean up
     if save:
-        spin.start(grn('Saving: ') + qt(min_path))
+        spin.start(grn('Saving: ') + qt(folder))
 
         merge(master, min_path, pack(rsinc.lsl(BASE_L + min_path, HASH_NAME)))
         write(MASTER, master)

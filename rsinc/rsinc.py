@@ -123,12 +123,15 @@ def calc_states(old, new):
     Calculates if files on one side have been updated, moved, deleted,
     created or stayed the same. Arguments are both Flats.
     '''
+    new_before_deletes = set(new.names.keys())
+
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
             # Want all clone-moves to leave delete place holders
             new.update(name, file.uid, file.time, DELETED)
 
-    for name, file in new.names.items():
+    for name in new_before_deletes:
+        file = new.names[name]
         if name in old.names:
             if old.names[name].uid != file.uid:
                 if file.uid in old.uids and not file.is_clone:
@@ -194,6 +197,7 @@ def _sync(old, lcl, rmt):
             continue
 
         s = get_mv_state(file, rmt)
+        # print(lcl.path, name, s, file.state)  # DEBUG
 
         if s == (MOVED, NOMOVE):
             if rmt.names[name].state == DELETED:
