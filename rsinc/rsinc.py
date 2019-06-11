@@ -200,6 +200,9 @@ def match_moves(old, lcl, rmt)
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
                 pass
+            elif rmt.names[name].moved:
+                # check uids match
+                pass
             elif name in old.names and lcl.uids[old.names[name].uid].moved:
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 tmv_rmt = rmt.names[name]
@@ -226,22 +229,18 @@ def match_moves(old, lcl, rmt)
                 nn = safe_move(f_rmt.name, name, rmt)
                 nn = balance_names(name, nn, lcl, rmt)
 
-        elif t == MOVED_U:
+        elif t == MOVED:
             f_rmt.synced = True
             nn = safe_move(name, f_rmt.name, lcl)
             nn = balance_names(nn, f_rmt.name, lcl, rmt)
             LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
-        elif t == MOVED_N or CLONE or NOTHERE:
+        elif t == CLONE or NOTHERE:
             safe_push(name, name, lcl, rmt)
 
 
 def trace_rmt(file, old, rmt):
     old_file = old.uids[file.uid]
-
-    if old_file.is_clone:
-        # Can't track clones by uid, returning CLONE forces push
-        return CLONE, '?'
 
     if old_file.name in rmt.names:
         rmt_file = rmt.names[old_file.name]
@@ -251,23 +250,25 @@ def trace_rmt(file, old, rmt):
                 trace = CLONE
             else:
                 trace = NOMOVE
+            return trace, rmt_file
         elif rmt.names[old_file.name].moved:
-            trace = MOVED_N
+            # Do uid trace
+            pass
         else:
-            trace = NOMOVE
-    elif old_file.uid in rmt.uids:
+            return NOMOVE, rmt_file
+
+    if old_file.uid in rmt.uids:
         rmt_file = rmt.uids[old_file.uid]
 
         if rmt.uids[old_file.uid].is_clone:
             trace = CLONE
         elif rmt.uids[old_file.uid].moved:
-            trace = MOVED_U
+            trace = MOVED
         else:
             trace = NOMOVE
+        return trace, rmt_file
     else:
-        trace = NOTHERE
-
-    return trace, rmt_file
+        return NOTHERE, "?"
 
 
 def recover(lcl, rmt):
