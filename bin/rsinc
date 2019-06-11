@@ -39,9 +39,8 @@ def read(file):
 
 def write(file, d):
     '''Writes dict to json'''
-    if not dry_run:
-        with open(file, 'w') as fp:
-            json.dump(d, fp, sort_keys=True, indent=2)
+    with open(file, 'w') as fp:
+        json.dump(d, fp, sort_keys=True, indent=2)
 
 
 def empty():
@@ -120,11 +119,6 @@ def _have(nest, chain):
             return _have(nest['fold'][chain[0]], chain[1:])
 
     return False
-
-
-def have(master, path):
-    '''Helper function for _have, converts path to chain'''
-    return _have(master, path.split('/'))
 
 
 # ****************************************************************************
@@ -220,17 +214,24 @@ recover = args.recovery
 # *                               Main Program                               *
 # ****************************************************************************
 
+HISTORY = '/home/conor/.rsinc/history.json'
 
 if args.purge:
     print(ylw('WARN'), 'Purging history of all folders')
     write(MASTER, empty())
+    write(HISTORY, set())
 
 # get the master structure
 if not os.path.exists(MASTER):
     print(ylw('WARN'), MASTER, 'missing, this must be your first run')
     write(MASTER, empty())
 
+if not os.path.exists(HISTORY):
+    print(ylw('WARN'), HISTORY, 'missing')
+    write(HISTORY, set())
+
 master = read(MASTER)
+history = set(read(HISTORY))
 
 if os.path.exists(TEMP_FILE):
     corrupt = read(TEMP_FILE)['folder']
@@ -250,7 +251,7 @@ for folder in folders:
     path_rmt = BASE_R + folder + '/'
 
     # Determine if first run
-    if have(master, folder):
+    if folder in history:
         print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
     else:
         print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
@@ -268,7 +269,6 @@ for folder in folders:
     # First run & recover mode
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
-        save = True
     else:
         print('Reading last state.')
         branch = get_branch(master, folder)
@@ -289,11 +289,28 @@ for folder in folders:
             print('Found no jobs')
         elif auto or strtobool[input('Execute? ')]:
             print(grn("Live pass:"))
-            save = True
 
             write(TEMP_FILE, {'folder': folder})
             rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
                        total=count, case=CASE_INSENSATIVE)
+
+            # Merge into master and history clean up
+            spin.start(grn('Saving: ') + qt(folder))
+
+            if recover:
+                command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
+                result = subprocess.Popen(command, stdout=subprocess.PIPE)
+                dirs = json.load(result.stdout)
+                history.add(folder)
+                history.update(folder + '/' + d['Path'] for d in dirs)
+                write(HISTORY, history)
+
+            merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+            write(MASTER, master)
+
+            subprocess.run(["rm", TEMP_FILE])
+
+            spin.stop_and_persist(symbol='✔')
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(folder))
@@ -302,18 +319,6 @@ for folder in folders:
             subprocess.run(["rclone", 'rmdirs', path_lcl])
 
             spin.stop_and_persist(symbol='✔')
-
-    # Merge into master and clean up
-    if save:
-        spin.start(grn('Saving: ') + qt(folder))
-
-        merge(master, min_path, pack(rsinc.lsl(BASE_L + min_path, HASH_NAME)))
-        write(MASTER, master)
-
-        if os.path.exists(TEMP_FILE):
-            subprocess.run(["rm", TEMP_FILE])
-
-        spin.stop_and_persist(symbol='✔')
 
     recover = args.recovery
 

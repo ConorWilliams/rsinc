@@ -15,7 +15,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="rsinc",
-    version="1.2",
+    version="1.3",
     author="ConorWilliams",
     author_email="conorwilliams@outlook.com",
     description="A tiny, hackable, two-way cloud synchronisation client for Linux",
