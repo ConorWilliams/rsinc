@@ -159,11 +159,13 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.count = 0
 
     if recover:
-        _recover(lcl, rmt)
-        _recover(rmt, lcl)
+        recover(lcl, rmt)
+        recover(rmt, lcl)
     else:
-        _sync(old, lcl, rmt)
-        _sync(old, rmt, lcl)
+        match_moves(old, lcl, rmt)
+        match_moves(old, rmt, lcl)
+        sync_states(old, lcl, rmt)
+        sync_states(old, rmt, lcl)
 
     lcl.clean()
     rmt.clean()
@@ -171,7 +173,7 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     return track.count
 
 
-def _recover(lcl, rmt):
+def recover(lcl, rmt):
     for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
@@ -184,173 +186,6 @@ def _recover(lcl, rmt):
             rmt.names[name].synced = True
         else:
             safe_push(name, name, lcl, rmt)
-
-
-def _sync(old, lcl, rmt):
-    '''Normal sync function'''
-    do_logic = [(NOMOVE, NOMOVE), (NOMOVE, CLONE),
-                (CLONE, NOMOVE), (CLONE, CLONE)]
-    do_cnflct = [(MOVED, NOMOVE), (MOVED, CLONE), (CLONE, MOVED)]
-
-    for name, file in sorted(lcl.names.items()):
-        if file.synced:
-            continue
-
-        s = get_mv_state(file, rmt)
-        # print(lcl.path, name, s, file.state)  # DEBUG
-
-        if s == (MOVED, NOMOVE):
-            if rmt.names[name].state == DELETED:
-                s = (MOVED, NOTHERE)
-            elif name in old.names and not rmt.names[name].is_clone:
-                # This deals with the degenerate double-move edge case
-                mvd_lcl = lcl.uids[old.names[name].uid]
-                tmv_rmt = rmt.names[name]
-                if mvd_lcl.moved:
-                    if not tmv_rmt.synced:
-                        tmv_rmt.synced = True
-                        mvd_lcl.synced = True
-                        nn = safe_move(name, mvd_lcl.name, rmt)
-                        nn = balance_names(mvd_lcl.name, nn, lcl, rmt)
-                        LOGIC[mvd_lcl.state][tmv_rmt.state](nn, nn, lcl, rmt)
-                    s = (MOVED, NOTHERE)
-
-        if s in do_logic:
-            rmt.names[name].synced = True
-            LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
-
-        elif s in do_cnflct:
-            rmt.names[name].synced = True
-            conflict(name, name, lcl, rmt)
-
-        elif s == (MOVED, MOVED):
-            rmt.names[name].synced = True
-            if file.uid != rmt.names[name].uid:
-                conflict(name, name, lcl, rmt)
-
-        elif s == (NOMOVE, MOVED):
-            if file.state == DELETED:
-                continue
-            else:
-                rmt.names[name].synced = True
-                conflict(name, name, lcl, rmt)
-
-        elif s == (CLONE, NOTHERE):
-            safe_push(name, name, lcl, rmt)
-
-        elif s == (NOMOVE, NOTHERE):
-            if file.state == DELETED:
-                # will hit MOVED:x in next pass if file to delete moved in rmt
-                continue
-
-            t, f_rmt = trace_rmt(file, old, rmt)
-
-            if t == MOVED_U:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl)
-                nn = balance_names(nn, f_rmt.name, lcl, rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
-
-            elif t == CLONE or NOTHERE:
-                safe_push(name, name, lcl, rmt)
-            else:
-                log.error(
-                    'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
-
-        elif s == (MOVED, NOTHERE):
-            t, f_rmt = trace_rmt(file, old, rmt)
-
-            if t == NOMOVE:
-                f_rmt.synced = True
-                if f_rmt.state == DELETED:
-                    delL(name, name, lcl, rmt)
-                else:
-                    nn = safe_move(f_rmt.name, name, rmt)
-                    nn = balance_names(name, nn, lcl, rmt)
-                    LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
-
-            elif t == MOVED_U:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl)
-                nn = balance_names(nn, f_rmt.name, lcl, rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
-
-            elif t == MOVED_N or CLONE or NOTHERE:
-                safe_push(name, name, lcl, rmt)
-
-            else:
-                log.error(
-                    'Fell off M:N switch in _sync, t = %s, name = %s', t, name)
-        else:
-            log.error('Fell off switch in _sync, s = (%d,%d), name = %s',
-                      s[0], s[1], name)
-
-
-def get_mv_state(file, rmt):
-    if file.is_clone:
-        if file.state == CREATED:
-            i = CLONE
-        else:
-            i = NOMOVE
-    elif file.moved:
-        i = MOVED
-    else:
-        i = NOMOVE
-
-    if file.name not in rmt.names:
-        j = NOTHERE
-    else:
-        if rmt.names[file.name].is_clone:
-            if rmt.names[file.name].state == CREATED:
-                j = CLONE
-            else:
-                j = NOMOVE
-        elif rmt.names[file.name].moved:
-            j = MOVED
-        else:
-            j = NOMOVE
-
-    return (i, j)
-
-
-def trace_rmt(file, old, rmt):
-    if file.state == CREATED:
-        # New files cant be traced, returning CLONE forces push
-        return CLONE, '?'
-
-    if file.moved:
-        old_file = old.uids[file.uid]
-        if old_file.is_clone:
-            # Can't track clones by uid, returning CLONE forces push
-            return CLONE, '?'
-    else:
-        old_file = old.names[file.name]
-
-    if old_file.name in rmt.names:
-        rmt_file = rmt.names[old_file.name]
-
-        if rmt.names[old_file.name].is_clone:
-            if mt.names[old_file.name].state == CREATED:
-                trace = CLONE
-            else:
-                trace = NOMOVE
-        elif rmt.names[old_file.name].moved:
-            trace = MOVED_N
-        else:
-            trace = NOMOVE
-    elif old_file.uid in rmt.uids:
-        rmt_file = rmt.uids[old_file.uid]
-
-        if rmt.uids[old_file.uid].is_clone:
-            trace = CLONE
-        elif rmt.uids[old_file.uid].moved:
-            trace = MOVED_U
-        else:
-            trace = NOMOVE
-    else:
-        trace = NOTHERE
-
-    return trace, rmt_file
 
 
 def balance_names(name_lcl, name_rmt, lcl, rmt):
