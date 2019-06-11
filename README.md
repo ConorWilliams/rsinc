@@ -1,6 +1,6 @@
 # Rsinc
 
-Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. I have deliberately tried to keep rsinc's source succinct (\~500 sloc, single script) in an attempt to make modifying rsinc to your own needs easier.
+Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. I hope rsinc's source is succinct enough to make modifying rsinc to your own needs easy.
 
 ## Features
 

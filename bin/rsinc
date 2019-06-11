@@ -194,8 +194,8 @@ strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
              '': True}
 
-ylw = colored.yellow   # delete/warn
-red = colored.red      # error/conflict
+ylw = colored.yellow   # warn
+red = colored.red      # error
 grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
@@ -216,8 +216,7 @@ else:
         cwd = ['/'.join(cwd)]
 
 # Set up logging
-log_file = LOG_FOLDER + datetime.now().strftime('%Y-%m-%d')
-logging.basicConfig(filename=log_file,
+logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
                     level=logging.DEBUG,
                     datefmt='%H:%M:%S',
                     format='%(asctime)s %(levelname)s: %(message)s',)
@@ -251,14 +250,13 @@ if not os.path.exists(MASTER):
 master = read(MASTER)
 
 if os.path.exists(TEMP_FILE):
-    print(red('ERROR') + ', detected a crash, found', TEMP_FILE)
-
     corrupt = read(TEMP_FILE)['folder']
     if corrupt in folders:
         folders.remove(corrupt)
 
     folders.insert(0, corrupt)
     recover = True
+    print(red('ERROR') + ', detected a crash, recovering', corrupt)
     logging.warning('Detected crash, recovering %s', corrupt)
 
 for folder in folders:
@@ -276,7 +274,6 @@ for folder in folders:
     else:
         print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
         recover = True
-        save = True
 
     # Scan directories
     spin.start(("Crawling: ") + qt(folder))
@@ -300,12 +297,9 @@ for folder in folders:
         rsinc.calc_states(old, rmt)
 
     # Main logic
-    dry_run = True
-
     print(grn('Dry pass:'))
-    count = rsinc.sync(lcl, rmt, old, recover, dry_run, case=CASE_INSENSATIVE)
-
-    dry_run = args.dry
+    count = rsinc.sync(lcl, rmt, old, recover,
+                       dry_run=True, case=CASE_INSENSATIVE)
 
     if dry_run:
         print('Found:', count, 'job(s)')
@@ -317,7 +311,7 @@ for folder in folders:
             save = True
 
             write(TEMP_FILE, {'folder': folder})
-            rsinc.sync(lcl, rmt, old, recover, dry_run,
+            rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
                        total=count, case=CASE_INSENSATIVE)
 
         if args.clean:

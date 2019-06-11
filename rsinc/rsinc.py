@@ -13,17 +13,8 @@ cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
 ylw = colored.yellow   # delete
 
-THESAME = 0
-UPDATED = 1
-DELETED = 2
-CREATED = 3
-
-NOMOVE = 0
-MOVED = 1
-CLONE = 2
-NOTHERE = 3
-MOVED_N = 4  # MOVED name trace
-MOVED_U = 5  # MOVED uid trace
+THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
+NOMOVE, MOVED, CLONE, NOTHERE, MOVED_N, MOVED_U = tuple(range(6))
 
 log = logging.getLogger(__name__)
 
