@@ -33,6 +33,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
         "cam"
     ],
     "HASH_NAME": "SHA-1",
+    "HISTORY": "/home/conor/.rsinc/history.json",
     "LOG_FOLDER": "/home/conor/.rsinc/logs/",
     "MASTER": "/home/conor/.rsinc/master.json",
     "TEMP_FILE": "/home/conor/.rsinc/rsinc.tmp"
@@ -44,6 +45,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 - `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true. 
 - `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags. 
 - `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
+- `HISTORY` is the file that will store a list of all previously synced folder/directories.
 - `LOG_FOLDER` is the path where log files will be written to.
 - `MASTER` is the file that will store an image of the local files at the last run.
 - `TEMP_FILE` is a file used to detect if rsinc has crashed during a run.
