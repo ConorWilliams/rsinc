@@ -54,6 +54,19 @@ class _Flat():
         else:
             self.uids.update({uid: self.files[-1]})
 
+    def file_update(file, name)
+        self.files.append(file)
+        self.files[-1].name = name
+
+        self.names.update({name: self.files[-1]})
+        self.lower.add(name.lower())
+
+        if file.uid in self.uids:
+            self.names[name].is_clone = True
+            self.uids[file.uid].is_clone = True
+        else:
+            self.uids.update({file.uid: self.files[-1]})
+
 
 class Flat(_Flat):
     def __init__(self, path):
@@ -173,6 +186,92 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     return track.count
 
 
+def match_moves(old, lcl, rmt)
+    names = set(lcl.names.keys())
+
+    new_lcl = Flat(lcl.path)
+    new_rmt = Flat(rmt.path)
+
+    for name, file in sorted(lcl.name.items()):
+        if file.synced or not file.moved:
+            new_lcl.file_update(file, name)
+            continue
+
+        if name in rmt.names:
+            if rmt.names[name].state == DELETED:
+                pass
+            elif name in old.names and lcl.uids[old.names[name].uid].moved:
+                mvd_lcl = lcl.uids[old.names[name].uid]
+                tmv_rmt = rmt.names[name]
+                if not tmv_rmt.synced:
+                    tmv_rmt.synced = True
+                    mvd_lcl.synced = True
+                    nn = safe_move(name, mvd_lcl.name, rmt)
+                    nn = balance_names(mvd_lcl.name, nn, lcl, rmt)
+                    new_lcl.file_update(mvd_lcl, nn)
+                    new_rmt.file_update(tmv_rmt, nn)
+            else:
+                rmt.names[name].synced = True
+                file.state = CREATED
+                new_lcl.file_update(file, name)
+                continue
+
+        t, f_rmt = trace(file, old, rmt)
+
+        if t == NOMOVE:
+            f_rmt.synced = True
+            if f_rmt.state == DELETED:
+                nn = safe_push(name, name, lcl, rmt)
+            else:
+                nn = safe_move(f_rmt.name, name, rmt)
+                nn = balance_names(name, nn, lcl, rmt)
+                
+                
+
+        elif t == MOVED_U:
+            f_rmt.synced = True
+            nn = safe_move(name, f_rmt.name, lcl)
+            nn = balance_names(nn, f_rmt.name, lcl, rmt)
+            LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
+
+        elif t == MOVED_N or CLONE or NOTHERE:
+            safe_push(name, name, lcl, rmt)
+
+
+def trace_rmt(file, old, rmt):
+    old_file = old.uids[file.uid]
+
+    if old_file.is_clone:
+        # Can't track clones by uid, returning CLONE forces push
+        return CLONE, '?'
+
+    if old_file.name in rmt.names:
+        rmt_file = rmt.names[old_file.name]
+
+        if rmt.names[old_file.name].is_clone:
+            if mt.names[old_file.name].state == CREATED:
+                trace = CLONE
+            else:
+                trace = NOMOVE
+        elif rmt.names[old_file.name].moved:
+            trace = MOVED_N
+        else:
+            trace = NOMOVE
+    elif old_file.uid in rmt.uids:
+        rmt_file = rmt.uids[old_file.uid]
+
+        if rmt.uids[old_file.uid].is_clone:
+            trace = CLONE
+        elif rmt.uids[old_file.uid].moved:
+            trace = MOVED_U
+        else:
+            trace = NOMOVE
+    else:
+        trace = NOTHERE
+
+    return trace, rmt_file
+
+
 def recover(lcl, rmt):
     for name, file in sorted(lcl.names.items()):
         if file.synced:
@@ -238,6 +337,7 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     push(name_s, nn, flat_s, flat_d)
     nn = balance_names(name_s, nn, flat_s, flat_d)
     flat_d.tmp.update(nn, 'null', 0)
+    return nn
 
 
 def safe_move(name_s, name_d, flat):
