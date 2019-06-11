@@ -165,6 +165,7 @@ DEFAULT_DIRS = config['DEFAULT_DIRS']
 MASTER = config['MASTER']
 LOG_FOLDER = config['LOG_FOLDER']
 TEMP_FILE = config['TEMP_FILE']
+HISTORY = config['HISTORY']
 
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
@@ -214,20 +215,19 @@ recover = args.recovery
 # *                               Main Program                               *
 # ****************************************************************************
 
-HISTORY = '/home/conor/.rsinc/history.json'
 
 if args.purge:
-    print(ylw('WARN'), 'Purging history of all folders')
+    print(ylw('WARN:'), 'Purging history of all folders')
     write(MASTER, empty())
     write(HISTORY, set())
 
 # get the master structure
 if not os.path.exists(MASTER):
-    print(ylw('WARN'), MASTER, 'missing, this must be your first run')
+    print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
     write(MASTER, empty())
 
 if not os.path.exists(HISTORY):
-    print(ylw('WARN'), HISTORY, 'missing')
+    print(ylw('WARN:'), HISTORY, 'missing')
     write(HISTORY, set())
 
 master = read(MASTER)
@@ -279,38 +279,36 @@ for folder in folders:
 
     # Main logic
     print(grn('Dry pass:'))
-    count = rsinc.sync(lcl, rmt, old, recover,
+    total = rsinc.sync(lcl, rmt, old, recover,
                        dry_run=True, case=CASE_INSENSATIVE)
 
-    if dry_run:
-        print('Found:', count, 'job(s)')
-    else:
-        if count == 0:
-            print('Found no jobs')
-        elif auto or strtobool[input('Execute? ')]:
+    print('Found:', total, 'job(s)')
+
+    if not dry_run and (auto or total == 0 or strtobool[input('Execute? ')]):
+        if total != 0:
             print(grn("Live pass:"))
 
             write(TEMP_FILE, {'folder': folder})
             rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
-                       total=count, case=CASE_INSENSATIVE)
+                       total=total, case=CASE_INSENSATIVE)
 
             # Merge into master and history clean up
             spin.start(grn('Saving: ') + qt(folder))
 
-            if recover:
-                command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
-                result = subprocess.Popen(command, stdout=subprocess.PIPE)
-                dirs = json.load(result.stdout)
-                history.add(folder)
-                history.update(folder + '/' + d['Path'] for d in dirs)
-                write(HISTORY, history)
-
-            merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
-            write(MASTER, master)
+            if total != 0:
+                merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+                write(MASTER, master)
 
             subprocess.run(["rm", TEMP_FILE])
-
             spin.stop_and_persist(symbol='✔')
+
+        if recover:
+            command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
+            result = subprocess.Popen(command, stdout=subprocess.PIPE)
+            dirs = json.load(result.stdout)
+            history.add(folder)
+            history.update(folder + '/' + d['Path'] for d in dirs)
+            write(HISTORY, history)
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(folder))

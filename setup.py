@@ -42,7 +42,8 @@ defult_config = {'BASE_R': 'onedrive:',
                  'DEFAULT_DIRS': ["cpp", "docs", "cam"],
                  'LOG_FOLDER': DRIVE_DIR + 'logs/',
                  'MASTER': DRIVE_DIR + 'master.json',
-                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp'}
+                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp',
+                 'HISTORY': DRIVE_DIR + 'history.json', }
 
 if not os.path.exists(DRIVE_DIR):
     subprocess.run(['mkdir', DRIVE_DIR])
