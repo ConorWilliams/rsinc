@@ -225,8 +225,6 @@ def match_moves(old, lcl, rmt)
             else:
                 nn = safe_move(f_rmt.name, name, rmt)
                 nn = balance_names(name, nn, lcl, rmt)
-                
-                
 
         elif t == MOVED_U:
             f_rmt.synced = True
