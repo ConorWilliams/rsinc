@@ -54,9 +54,9 @@ Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are paths t
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
-Rsinc will detect the first run on a path and launch **recovery mode** which will make the two paths (local and remote) identical by copying any files that exist on just one side to the other and copying the newest version of any files that exist both sides to the other. Recovery mode **does not delete** any files however conflicting files will be overwritten (keeping newest).
+Rsinc will detect the first run on a path and launch **recovery mode** which will make the two paths (local and remote) identical by copying any files that exist on just one side to the other and copying the newest version of any files that exist both sides to the other. Recovery mode **does not delete** any files however, conflicting files will be overwritten (keeping newest).
 
-If it is not the first run on a path rsinc will perform a traditional two-way synchronisation, tracking if the files have been moved, deleted or updated then mirroring these actions. Conflicts are resolved by renaming the files and copying both ways (no data loss).  
+If it is not the first run on a path rsinc will perform a traditional two-way synchronisation, tracking if the files have been moved, deleted or updated then mirroring these actions. Conflicts are resolved by renaming the files and then copying them both ways (no data loss).  
 
 ### Command Line Arguments
 

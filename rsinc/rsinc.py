@@ -123,23 +123,26 @@ def calc_states(old, new):
     Calculates if files on one side have been updated, moved, deleted,
     created or stayed the same. Arguments are both Flats.
     '''
-    for name, file in new.names.items():
-        if name in old.names:
-            if old.names[name].uid != file.uid:
-                file.state = UPDATED
-            else:
-                file.state = THESAME
-        elif file.uid in old.uids and not file.is_clone
-                                  and old.uids[file.uid].name not in new.names:
-            file.moved = True
-            file.state = THESAME
-        else:
-            file.state = CREATED
-
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
             # Want all clone-moves to leave delete place holders
             new.update(name, file.uid, file.time, DELETED)
+
+    for name, file in new.names.items():
+        if name in old.names:
+            if old.names[name].uid != file.uid:
+                if file.uid in old.uids and not file.is_clone:
+                    file.moved = True
+                    file.state = THESAME
+                else:
+                    file.state = UPDATED
+            else:
+                file.state = THESAME
+        elif file.uid in old.uids and not file.is_clone:
+            file.moved = True
+            file.state = THESAME
+        else:
+            file.state = CREATED
 
 
 def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
@@ -192,8 +195,19 @@ def _sync(old, lcl, rmt):
 
         s = get_mv_state(file, rmt)
 
-        if s == (MOVED, NOMOVE) and rmt.names[name].state == DELETED:
-            s = (MOVED, NOTHERE)
+        if s == (MOVED, NOMOVE):
+            if rmt.names[name].state == DELETED:
+                s = (MOVED, NOTHERE)
+            elif name in old.names and not rmt.names[name].is_clone:
+                # This deals with the degenerate double move
+                f_lcl = lcl.uids[old.names[name].uid]
+                if f_lcl.moved:
+                    rmt.names[name].synced = True
+                    f_lcl.synced = True
+                    nn = safe_move(name, f_lcl.name, rmt)
+                    nn = balance_names(f_lcl.name, nn, lcl, rmt)
+                    LOGIC[f_lcl.state][rmt.names[name].state](nn, nn, lcl, rmt)
+                    s = (MOVED, NOTHERE)
 
         if s in do_logic:
             rmt.names[name].synced = True
