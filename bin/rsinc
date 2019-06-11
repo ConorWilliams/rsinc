@@ -153,8 +153,6 @@ def get_min(master, path):
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="Folders to sync", nargs='*')
-parser.add_argument("--config",
-                    help="Path to config file (default ~/.rsinc/config.json)")
 parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
 parser.add_argument("-c", "--clean", action="store_true",
                     help="Clean directories")
@@ -166,6 +164,8 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
                     action="store_true")
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
+parser.add_argument("--config", help="Path to config file (default ~/.rsinc/config.json)")
+
 
 args = parser.parse_args()
 

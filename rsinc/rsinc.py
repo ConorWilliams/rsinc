@@ -136,11 +136,7 @@ def calc_states(old, new):
 
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
-            uid = file.uid
-            while uid in new.uids:
-                # Force unique uid for delete place-holders
-                uid += '0'
-            new.update(name, uid, file.time, DELETED)
+            new.update(name, file.uid, file.time, DELETED)
 
 
 def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
@@ -243,9 +239,12 @@ def _sync(old, lcl, rmt):
 
             if t == NOMOVE:
                 f_rmt.synced = True
-                nn = safe_move(f_rmt.name, name, rmt)
-                nn = balance_names(name, nn, lcl, rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
+                if f_rmt.state = DELETED:
+                    delL(name, name, lcl, rmt)
+                else:
+                    nn = safe_move(f_rmt.name, name, rmt)
+                    nn = balance_names(name, nn, lcl, rmt)
+                    LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
 
             elif t == MOVED_U:
                 f_rmt.synced = True
@@ -279,7 +278,10 @@ def calc_mv_state(file, rmt):
         j = NOTHERE
     else:
         if rmt.names[file.name].is_clone:
-            j = CLONE
+            if rmt.names[file.name].state == CREATED:
+                j = CLONE
+            else:
+                j = NOMOVE
         elif rmt.names[file.name].moved:
             j = MOVED
         else:
@@ -361,13 +363,14 @@ def resolve_case(name, flat):
     '''
     global track
 
-    if not track.case:
-        return name_d
-
     new_name = name
 
-    while new_name.lower() in flat.lower or new_name.lower() in flat.tmp.lower:
-        new_name = prepend(new_name, '_')
+    if track.case:
+        while new_name.lower() in flat.lower or new_name.lower() in flat.tmp.lower:
+            new_name = prepend(new_name, '_')
+    else:
+        while new_name in flat.names or new_name in flat.tmp.names:
+            new_name = prepend(new_name, '_')
 
     return new_name
 
