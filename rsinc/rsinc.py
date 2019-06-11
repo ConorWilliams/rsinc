@@ -199,14 +199,16 @@ def _sync(old, lcl, rmt):
             if rmt.names[name].state == DELETED:
                 s = (MOVED, NOTHERE)
             elif name in old.names and not rmt.names[name].is_clone:
-                # This deals with the degenerate double move
-                f_lcl = lcl.uids[old.names[name].uid]
-                if f_lcl.moved:
-                    rmt.names[name].synced = True
-                    f_lcl.synced = True
-                    nn = safe_move(name, f_lcl.name, rmt)
-                    nn = balance_names(f_lcl.name, nn, lcl, rmt)
-                    LOGIC[f_lcl.state][rmt.names[name].state](nn, nn, lcl, rmt)
+                # This deals with the degenerate double-move edge case
+                mvd_lcl = lcl.uids[old.names[name].uid]
+                tmv_rmt = rmt.names[name]
+                if mvd_lcl.moved:
+                    if not tmv_rmt.synced:
+                        tmv_rmt.synced = True
+                        mvd_lcl.synced = True
+                        nn = safe_move(name, mvd_lcl.name, rmt)
+                        nn = balance_names(mvd_lcl.name, nn, lcl, rmt)
+                        LOGIC[mvd_lcl.state][tmv_rmt.state](nn, nn, lcl, rmt)
                     s = (MOVED, NOTHERE)
 
         if s in do_logic:

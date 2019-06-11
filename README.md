@@ -45,7 +45,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 - `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags. 
 - `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
 - `LOG_FOLDER` is the path where log files will be written to.
-- `MASTER` is the file that will store data about the contents of local and remote at the last run.
+- `MASTER` is the file that will store an image of the local files at the last run.
 - `TEMP_FILE` is a file used to detect if rsinc has crashed during a run.
 
 ## Using
@@ -88,14 +88,16 @@ local created     | conflict      | conflict    | push local    | conflict
 
 This allows for complex tracking such as - a local move and a remote modification -  being compound.
 
-Throughout rsinc clones are only moved if the move can be unambiguously determined.
+Throughout rsinc clones are only moved if the move can be unambiguously determined and moving a clone will trigger a delete and copy operation instead of a move operation for the same reason.
 
 ### Recovery Mode
 
-moves 
+In recovery mode rsinc will make local and remote identical by copying any files missing on either side to their complimentary location. If two files exist on both sides and do not have the same ID (i.e they are different) rsinc will overwrite the oldest file with the newer one.
 
 ### Selective Syncing
 
+Rsinc stores an image of the last state in a tree structure called `master`, this enables selective syncing. i.e syncing all the files in `dir1/dir2` but leaving all the other files in `dir1` un-synced. This is achieved by syncing `dir1/dir2` then merging the new state of `dir1/dir2` into a branch of `master` without altering `master`s memory of all the other files/folders in `dir1`. This means when syncing sub folders, rsinc minimises the work `rclone lsjson` does. This is important as `rclone lsjson` is the speed bottle neck of syncing.
+
 ### Logging
 
-As well as printing to the terminal everything rsinc does, detailed logs are kept at `~/.rsinc/logs/` of all the actions rsinc performs.
+As well as printing to the terminal everything rsinc does, logs are kept at `~/.rsinc/logs/` of all the actions rsinc performs.
