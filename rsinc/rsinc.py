@@ -26,7 +26,8 @@ log = logging.getLogger(__name__)
 
 
 class File():
-    def __init__(self, uid, time, state, moved, is_clone, synced):
+    def __init__(self, name, uid, time, state, moved, is_clone, synced):
+        self.name = name
         self.uid = uid
         self.time = time
 
@@ -50,7 +51,7 @@ class Flat():
                is_clone=False, synced=False):
 
         self.names.update(
-            {name: File(uid, time, state, moved, is_clone, synced)})
+            {name: File(name, uid, time, state, moved, is_clone, synced)})
         self.lower.add(name.lower())
 
         if uid in self.uids:
@@ -64,7 +65,7 @@ class Flat():
         for file in self.names.values():
             file.synced = False
 
-    def rm(name):
+    def rm(self, name):
         if not self.names[name].is_clone:
             del self.uids[self.names[name].uid]
 
@@ -237,7 +238,7 @@ def match_moves(old, lcl, rmt):
                 # moved therefore rename rmt and procced with move
                 safe_move(name, name, rmt)
 
-        t, f_rmt = trace(file, old, rmt)
+        t, f_rmt = trace_rmt(file, old, rmt)
 
         if t == NOMOVE:
             f_rmt.synced = True
