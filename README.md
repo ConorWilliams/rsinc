@@ -1,6 +1,6 @@
 # Rsinc
 
-Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. I hope rsinc's source is succinct enough (\~600 sloc across two files) to make modifying rsinc to your own needs easy.
+Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. Rsinc is tracks file moves and saves bandwidth. Rsinc (in normal mode) uses only file hashes and sizes to track files thus avoiding undependable file time stamps. I hope rsinc's source is succinct enough (\~600 sloc across two files) to make modifying rsinc to your own needs easy.
 
 ## Features
 
@@ -53,7 +53,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are paths to folders/directories in `BASE_L` or `BASE_R` that will be synced. Alternatively `cd` to a path in `BASE_L` and run: `rsinc`. If any of the paths to not exist in in either local or remote rsinc will mkdir.  
+Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not conver it to a relative path. If any of the paths do not exist in in either local or remote rsinc will mkdir.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
