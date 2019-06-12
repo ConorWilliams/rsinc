@@ -43,6 +43,15 @@ def write(file, d):
         json.dump(d, fp, sort_keys=True, indent=2)
 
 
+STB = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
+       '1': True, "0": False, 't': True, 'true': True, 'f': False,
+       'false': False, '': False}
+
+
+def strtobool(string)
+    return STB[string.lower()]
+
+
 def empty():
     '''Returns dict representing empty directory.'''
     return {'fold': {}, 'file': {}}
@@ -169,11 +178,6 @@ LOG_FOLDER = config['LOG_FOLDER']
 TEMP_FILE = config['TEMP_FILE']
 HISTORY = config['HISTORY']
 
-strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
-             '1': True, "0": False, 't': True, 'true': True, 'f': False,
-             'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
-             '': False}
-
 ylw = colored.yellow   # warn
 red = colored.red      # error
 grn = colored.green    # info
@@ -287,7 +291,7 @@ for folder in folders:
 
     print('Found:', total, 'job(s)')
 
-    if not dry_run and (auto or total == 0 or strtobool[input('Execute? ')]):
+    if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
         if total != 0 or recover:
             print(grn("Live pass:"))
 
