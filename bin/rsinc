@@ -204,17 +204,14 @@ else:
 folders = []
 for f in tmp:
     if len(f) < len(BASE_L) - 1:
-        print('Rejecting', f, 'not in', BASE_L)
+        print(ylw('Rejecting:'), f, 'not in', BASE_L)
         continue
     for b, c in zip(BASE_L, f):
         if b != c:
-            print('Rejecting', f, 'not in', BASE_L)
+            print(ylw('Rejecting:'), f, 'not in', BASE_L)
             break
     else:
         folders.append(f[len(BASE_L):])
-
-if len(folders) == 0:
-    folders = DEFAULT_DIRS
 
 # Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
