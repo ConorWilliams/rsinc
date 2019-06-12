@@ -28,9 +28,10 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
     "BASE_R": "onedrive:",
     "CASE_INSENSATIVE": true,
     "DEFAULT_DIRS": [
-        "cpp",
-        "docs",
-        "cam"
+        "/home/conor/cpp",
+        "/home/conor/docs",
+        "/home/conor/cam",
+        "/home/conor/py"
     ],
     "HASH_NAME": "SHA-1",
     "HISTORY": "/home/conor/.rsinc/history.json",
