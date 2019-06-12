@@ -45,7 +45,7 @@ class Flat():
         self.path = path
         self.names = {}
         self.uids = {}
-        self.lower = set({})
+        self.lower = set()
 
     def update(self, name, uid, time=0, state=THESAME, moved=False,
                is_clone=False, synced=False):
@@ -56,7 +56,7 @@ class Flat():
 
         if uid in self.uids:
             self.names[name].is_clone = True
-            self.names[self.uids[uid]].is_clone = True
+            self.uids[uid].is_clone = True
             self.uids.update({uid: self.names[name]})
         else:
             self.uids.update({uid: self.names[name]})
@@ -83,7 +83,7 @@ class Struct():
         self.case = True
 
 
-track = Struct()  # global used to track how many operations sync needs
+track = Struct()  # global used to track how many operations sync needs.
 
 # ****************************************************************************
 # *                                 Functions                                *
@@ -93,7 +93,7 @@ track = Struct()  # global used to track how many operations sync needs
 def lsl(path, hash_name):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
-    uid and last modified time
+    uid and last modified time.
     '''
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
@@ -117,7 +117,7 @@ def lsl(path, hash_name):
 def prepend(name, prefix):
     '''
     Adds 'prefix' to the begging of the file name, 'name' and returns the new
-    name
+    name.
     '''
     new_name = name.split('/')
     new_name[-1] = prefix + new_name[-1]
@@ -130,11 +130,11 @@ def calc_states(old, new):
     Calculates if files on one side have been updated, moved, deleted,
     created or stayed the same. Arguments are both Flats.
     '''
-    new_before_deletes = set(new.names.keys())
+    new_before_deletes = tuple(new.names.keys())
 
     for name, file in old.names.items():
         if name not in new.names and (file.uid not in new.uids or file.is_clone):
-            # Want all clone-moves to leave delete place holders
+            # Want all clone-moves to leave delete place holders.
             new.update(name, file.uid, file.time, DELETED)
 
     for name in new_before_deletes:
@@ -156,6 +156,7 @@ def calc_states(old, new):
 
 
 def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
+    ''' Main sync function runs appropriate sync depending on arguments.'''
     global track
 
     track.lcl = lcl.path
@@ -188,6 +189,10 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 
 
 def match_states(lcl, rmt):
+    '''
+    Basic sync given all moves performed. Uses LOGIC array do determine 
+    actions, see bottom of file.
+    '''
     for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
@@ -202,11 +207,12 @@ def match_states(lcl, rmt):
 
 
 def match_moves(old, lcl, rmt):
-    names = list(lcl.names.keys())
+    '''Matches any moves in local by making complimentary moves in rmt.'''
+    names = tuple(sorted(lcl.names.keys()))
 
     for name in names:
         if name not in lcl.names:
-            # Caused by degenerate, double-move edge case
+            # Caused by degenerate, double-move edge case.
             continue
         else:
             file = lcl.names[name]
@@ -218,13 +224,14 @@ def match_moves(old, lcl, rmt):
 
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
-                # Can move like normal
+                # Can move like normal.
+                # Will trigger rename - needs more code.
                 pass
             elif file.uid == rmt.names[name].uid:
-                # Uids match therefore both moved to same place in lcl and rmt
+                # Uids match therefore both moved to same place in lcl and rmt.
                 continue
             elif name in old.names and lcl.uids[old.names[name].uid].moved:
-                # This deals with the degenerate, double-move edge case
+                # This deals with the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 tmv_rmt = rmt.names[name]
 
@@ -235,7 +242,7 @@ def match_moves(old, lcl, rmt):
                 balance_names(mvd_lcl.name, nn, lcl, rmt)
             else:
                 # Not deleted, not not been moved there and not supposed to be
-                # moved therefore rename rmt and procced with move
+                # moved therefore rename rmt and procced with move.
                 safe_move(name, name, rmt)
 
         t, f_rmt = trace_rmt(file, old, rmt)
@@ -244,10 +251,10 @@ def match_moves(old, lcl, rmt):
             f_rmt.synced = True
 
             if f_rmt.state == DELETED:
-                # Delete shy
+                # Delete shy.
                 safe_push(name, name, lcl, rmt)
             else:
-                # Move pair in rmt
+                # Move complimentary in rmt.
                 nn = safe_move(f_rmt.name, name, rmt)
                 balance_names(name, nn, lcl, rmt)
 
@@ -261,6 +268,7 @@ def match_moves(old, lcl, rmt):
 
 
 def trace_rmt(file, old, rmt):
+    '''Finds state of 'file' (a file moved in lcl) in rmt.'''
     old_file = old.uids[file.uid]
 
     if old_file.name in rmt.names:
@@ -289,10 +297,11 @@ def trace_rmt(file, old, rmt):
             trace = NOMOVE
         return trace, rmt_file
     else:
-        return NOTHERE, "?"
+        return NOTHERE, None
 
 
 def recover_sync(lcl, rmt):
+    '''Basic sync, if files uids conflict keeps newest'''
     for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
@@ -310,7 +319,7 @@ def recover_sync(lcl, rmt):
 def balance_names(name_lcl, name_rmt, lcl, rmt):
     '''
     Used to match names when a case-conflict-rename generates name 
-    differences between local and remote
+    differences between local and remote.
     '''
     nn_lcl = name_lcl
     nn_rmt = name_rmt
@@ -334,7 +343,7 @@ def resolve_case(name, flat):
     '''
     Detects if 'name_s' has any case conflicts in any of the Flat()'s in 
     'flat_d'. If it does name is modified until no case conflicts occur and the 
-    new name returned
+    new name returned.
     '''
     global track
 
@@ -351,6 +360,10 @@ def resolve_case(name, flat):
 
 
 def safe_push(name_s, name_d, flat_s, flat_d):
+    '''
+    Push name_s to name_d making sure name_d, avoids name/case conflicts and 
+    balances names if they change.
+    '''
     nn = resolve_case(name_s, flat_d)
     push(name_s, nn, flat_s, flat_d)
 
@@ -361,7 +374,10 @@ def safe_push(name_s, name_d, flat_s, flat_d):
 
 
 def safe_move(name_s, name_d, flat):
-    '''Move source to dest'''
+    '''
+    Move name_s to name_d, avoids case/name conflicts and renames if necessary. 
+    'Flat' is updated to contain new name and remove old name. Returns new name.
+    '''
     global track
     track.count += 1
 
@@ -390,6 +406,7 @@ def safe_move(name_s, name_d, flat):
 
 
 def push(name_s, name_d, flat_s, flat_d):
+    '''Copy name_s in flat_s to name_d in flat_d. No name checks'''
     global track
     track.count += 1
 
@@ -413,12 +430,12 @@ def push(name_s, name_d, flat_s, flat_d):
 
 
 def pull(name_s, name_d, flat_s, flat_d):
-    '''Copy source (at remote) to dest (at local)'''
+    '''Copy name_d in flat_d to name_s in flat_s. No name checks.'''
     push(name_d, name_s, flat_d, flat_s)
 
 
 def conflict(name_s, name_d, flat_s, flat_d):
-    '''Rename and copy conflicts both ways'''
+    '''Rename and copy conflicts both ways.'''
     global track
 
     print(red('Conflict') + ' %d:%d: %s' % (flat_s.names[name_s].state,
@@ -436,7 +453,7 @@ def conflict(name_s, name_d, flat_s, flat_d):
 
 
 def delL(name_s, name_d, flat_s, flat_d):
-    '''Delete local (at local)'''
+    '''Delete name_s in flat_s.'''
     global track
     track.count += 1
 
@@ -451,14 +468,14 @@ def delL(name_s, name_d, flat_s, flat_d):
 
 
 def delR(name_s, name_d, flat_s, flat_d):
-    '''Delete remote (at remote)'''
+    '''Delete name_d in flat_d.'''
     delL(name_d, name_s, flat_d, flat_s)
 
 
 def null(*args):
     return
 
-
+# Encodes logic for match names function.
 LOGIC = [[null, pull, delL, conflict],
          [push, conflict, push, conflict],
          [delR, pull, null, pull],
