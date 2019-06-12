@@ -25,58 +25,45 @@ log = logging.getLogger(__name__)
 
 
 class File():
-    def __init__(self, name, uid, time, state):
-        self.name = name
+    def __init__(self, uid, time, state, moved, is_clone, synced):
         self.uid = uid
         self.time = time
+
         self.state = state
-        self.moved = False
-        self.is_clone = False
-        self.synced = False
+        self.moved = moved
+        self.is_clone = is_clone
+        self.synced = synced
 
 
-class _Flat():
+class Flat():
     def __init__(self, path):
         self.path = path
-        self.files = []
-        self.uids = {}
         self.names = {}
+        self.uids = {}
         self.lower = set({})
 
-    def update(self, name, uid, time, state=THESAME):
-        self.files.append(File(name, uid, time, state))
-        self.names.update({name: self.files[-1]})
+    def update(self, name, uid, time, state=THESAME, moved=False, is_clone=False, synced=False):
+
+        self.names.update(
+            {name: File(uid, time, state, moved, is_clone, synced)})
         self.lower.add(name.lower())
 
         if uid in self.uids:
             self.names[name].is_clone = True
-            self.uids[uid].is_clone = True
+            self.names[self.uids[uid]].is_clone = True
         else:
-            self.uids.update({uid: self.files[-1]})
-
-    def file_update(file, name)
-        self.files.append(file)
-        self.files[-1].name = name
-
-        self.names.update({name: self.files[-1]})
-        self.lower.add(name.lower())
-
-        if file.uid in self.uids:
-            self.names[name].is_clone = True
-            self.uids[file.uid].is_clone = True
-        else:
-            self.uids.update({file.uid: self.files[-1]})
-
-
-class Flat(_Flat):
-    def __init__(self, path):
-        _Flat.__init__(self, path)
-        self.tmp = _Flat(path)
+            self.uids.update({uid: name})
 
     def clean(self):
         self.tmp = _Flat(self.path)
         for file in self.files:
             file.synced = False
+
+    def rm(name):
+        if not self.names[name].is_clone:
+            del self.uids[self.names[name].uid]
+
+        del self.names[name]
 
 
 class Struct():
