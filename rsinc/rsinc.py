@@ -172,11 +172,7 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     if recover:
         recover_sync(cp_lcl, cp_rmt)
         recover_sync(cp_rmt, cp_lcl)
-
-        lcl.clean()
-        rmt.clean()
     else:
-
         match_moves(old, cp_lcl, cp_rmt)
         match_moves(old, cp_rmt, cp_lcl)
 
@@ -398,7 +394,7 @@ def safe_move(name_s, name_d, flat):
     elif base == track.rmt:
         col = mgt
 
-    info = col('Move') + '(%s): ' % base + name_s + col(' to: ') + nn_d
+    info = col('Move:') + ' (%s) ' % base + name_s + col(' to: ') + nn_d
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
@@ -431,7 +427,7 @@ def push(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('%s      : %s', text.upper(), name_d)
+        log.info('%s:     %s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
         subprocess.run(cmd)
     else:
@@ -452,7 +448,7 @@ def conflict(name_s, name_d, flat_s, flat_d):
                                              name_s),)
 
     if not track.dry:
-        log.warning('CONFLICT: %s', name_s)
+        log.info('CONFLICT: %s', name_s)
 
     nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flat_s)
     nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flat_d)
