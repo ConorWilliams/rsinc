@@ -9,7 +9,7 @@ Near:
 - [x] Make root folder if lsl fails
 - [x] Update readme
 - [x] Complete readme
-- [ ] Separate moving and basic syncing into two functions.
+- [x] Separate moving and basic syncing into two functions.
 - [ ] Document edge cases
 
 
