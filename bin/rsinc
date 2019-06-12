@@ -48,7 +48,7 @@ STB = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
        'false': False, '': False}
 
 
-def strtobool(string)
+def strtobool(string):
     return STB[string.lower()]
 
 
@@ -194,14 +194,16 @@ elif len(args.folders) == 0:
 else:
     tmp = []
     for f in args.folders:
-        if f[0] == '/':
+        if len(f) == 0:
+            tmp.append(BASE_L[:-1])
+        elif f[0] == '/':
             tmp.append(f)
         else:
             tmp.append(cwd + '/' + f)
 
 folders = []
 for f in tmp:
-    if len(f) < len(BASE_L):
+    if len(f) < len(BASE_L) - 1:
         print('Rejecting', f, 'not in', BASE_L)
         continue
     for b, c in zip(BASE_L, f):
@@ -213,7 +215,6 @@ for f in tmp:
 
 if len(folders) == 0:
     folders = DEFAULT_DIRS
-
 
 # Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),

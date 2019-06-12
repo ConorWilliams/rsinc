@@ -1,6 +1,6 @@
 # Rsinc
 
-Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. Rsinc is tracks file moves and saves bandwidth. Rsinc (in normal mode) uses only file hashes and sizes to track files thus avoiding undependable file time stamps. I hope rsinc's source is succinct enough (\~600 sloc across two files) to make modifying rsinc to your own needs easy.
+Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. Rsinc tracks file moves and saves bandwidth. Rsinc (in normal mode) uses only file hashes and sizes to track files thus avoiding unreliable time stamps. I hope rsinc's source is succinct enough (\~600 sloc across two files) to make modifying rsinc to your own needs easy.
 
 ## Features
 
@@ -21,7 +21,7 @@ Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc`
 
 Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 
-Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like something like this by default:
+Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like this by default:
 
 ```json {
     "BASE_L": "/home/conor/",
