@@ -188,7 +188,13 @@ if args.default:
 elif len(args.folders) == 0:
     tmp = [cwd]
 else:
-    tmp = [cwd + '/' + f for f in args.folders]
+    tmp = []
+    for f in args.folders:
+        if f[0] == '/':
+            tmp.append(f)
+        else:
+            tmp.append(cwd + '/' + f)
+
 
 folders = []
 
