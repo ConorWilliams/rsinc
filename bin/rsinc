@@ -186,7 +186,7 @@ cwd = os.getcwd()
 if args.default:
     tmp = DEFAULT_DIRS
 elif len(args.folders) == 0:
-    tmp = [cwd + '/']
+    tmp = [cwd]
 else:
     tmp = [cwd + '/' + f for f in args.folders]
 
@@ -205,6 +205,7 @@ for f in tmp:
 
 if len(folders) == 0:
     folders = DEFAULT_DIRS
+
 
 # Set up logging
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
