@@ -63,9 +63,8 @@ def insert(nest, chain):
 def pack(flat):
     '''Converts flat, into packed dict'''
     nest = empty()
-    for file in flat.files:
-        chain = file.name.split(
-            '/') + [{'uid': file.uid, 'datetime': file.time}]
+    for name, file in flat.names.items():
+        chain = name.split('/') + [{'uid': file.uid, 'datetime': file.time}]
         insert(nest, chain)
 
     return nest
@@ -285,7 +284,7 @@ for folder in folders:
     print('Found:', total, 'job(s)')
 
     if not dry_run and (auto or total == 0 or strtobool[input('Execute? ')]):
-        if total != 0:
+        if total != 0 or recover:
             print(grn("Live pass:"))
 
             write(TEMP_FILE, {'folder': folder})
@@ -295,9 +294,8 @@ for folder in folders:
             # Merge into master and history clean up
             spin.start(grn('Saving: ') + qt(folder))
 
-            if total != 0:
-                merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
-                write(MASTER, master)
+            merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+            write(MASTER, master)
 
             subprocess.run(["rm", TEMP_FILE])
             spin.stop_and_persist(symbol='✔')
@@ -310,13 +308,13 @@ for folder in folders:
             history.update(folder + '/' + d['Path'] for d in dirs)
             write(HISTORY, history)
 
-        if args.clean:
-            spin.start(grn('Pruning: ') + qt(folder))
+    if args.clean:
+        spin.start(grn('Pruning: ') + qt(folder))
 
-            subprocess.run(["rclone", 'rmdirs', path_rmt])
-            subprocess.run(["rclone", 'rmdirs', path_lcl])
+        subprocess.run(["rclone", 'rmdirs', path_rmt])
+        subprocess.run(["rclone", 'rmdirs', path_lcl])
 
-            spin.stop_and_persist(symbol='✔')
+        spin.stop_and_persist(symbol='✔')
 
     recover = args.recovery
 

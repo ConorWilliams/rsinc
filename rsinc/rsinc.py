@@ -241,10 +241,12 @@ def match_moves(old, lcl, rmt):
 
         if t == NOMOVE:
             f_rmt.synced = True
+
             if f_rmt.state == DELETED:
                 # Delete shy
                 safe_push(name, name, lcl, rmt)
             else:
+                # Move pair in rmt
                 nn = safe_move(f_rmt.name, name, rmt)
                 balance_names(name, nn, lcl, rmt)
 
