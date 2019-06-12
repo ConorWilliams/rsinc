@@ -49,7 +49,10 @@ STB = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
 
 
 def strtobool(string):
-    return STB[string.lower()]
+    if string.lower() in STB:
+        return STB[string.lower()]
+    else:
+        return 0
 
 
 def empty():

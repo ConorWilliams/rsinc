@@ -166,15 +166,16 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.case = case
     track.count = 0
 
+    cp_lcl = deepcopy(lcl)
+    cp_rmt = deepcopy(rmt)
+
     if recover:
-        recover_sync(lcl, rmt)
-        recover_sync(rmt, lcl)
+        recover_sync(cp_lcl, cp_rmt)
+        recover_sync(cp_rmt, cp_lcl)
 
         lcl.clean()
         rmt.clean()
     else:
-        cp_lcl = deepcopy(lcl)
-        cp_rmt = deepcopy(rmt)
 
         match_moves(old, cp_lcl, cp_rmt)
         match_moves(old, cp_rmt, cp_lcl)
@@ -401,7 +402,7 @@ def safe_move(name_s, name_d, flat):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('MOVE(%s): %s TO %s', base, name_s, nn_d)
+        log.info('MOVE:     (%s) %s TO %s', base, name_s, nn_d)
         subprocess.run(['rclone', 'moveto', base + name_s, base + nn_d])
     else:
         print(info)
@@ -430,7 +431,7 @@ def push(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('%s: %s', text.upper(), name_d)
+        log.info('%s      : %s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
         subprocess.run(cmd)
     else:
@@ -446,9 +447,9 @@ def conflict(name_s, name_d, flat_s, flat_d):
     '''Rename and copy conflicts both ways.'''
     global track
 
-    print(red('Conflict') + ' %d:%d: %s' % (flat_s.names[name_s].state,
-                                            flat_d.names[name_d].state,
-                                            name_s),)
+    print(red('Conflict: ') + '%d:%d: %s' % (flat_s.names[name_s].state,
+                                             flat_d.names[name_d].state,
+                                             name_s),)
 
     if not track.dry:
         log.warning('CONFLICT: %s', name_s)
@@ -469,7 +470,7 @@ def delL(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('DELETE: %s', flat_s.path + name_s)
+        log.info('DELETE:   %s', flat_s.path + name_s)
         subprocess.run(['rclone', 'delete', flat_s.path + name_s])
     else:
         print(info)
