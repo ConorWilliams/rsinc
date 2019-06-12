@@ -144,6 +144,9 @@ parser.add_argument(
 
 
 args = parser.parse_args()
+dry_run = args.dry
+auto = args.auto
+recover = args.recovery
 
 
 # ****************************************************************************
@@ -180,7 +183,9 @@ spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 # Decide which folder(s) to sync
 cwd = os.getcwd()
 
-if len(args.folders) == 0:
+if args.default:
+    tmp = DEFAULT_DIRS
+elif len(args.folders) == 0:
     tmp = [cwd + '/']
 else:
     tmp = [cwd + '/' + f for f in args.folders]
@@ -206,17 +211,6 @@ logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
                     level=logging.DEBUG,
                     datefmt='%H:%M:%S',
                     format='%(asctime)s %(levelname)s: %(message)s',)
-
-if args.default:
-    folders = DEFAULT_DIRS
-elif args.folders == []:
-    folders = cwd
-else:
-    folders = args.folders
-
-dry_run = args.dry
-auto = args.auto
-recover = args.recovery
 
 
 # ****************************************************************************
@@ -253,8 +247,6 @@ if os.path.exists(TEMP_FILE):
 
 for folder in folders:
     print('')
-    save = False
-
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
