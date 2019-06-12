@@ -56,9 +56,9 @@ class Flat():
         if uid in self.uids:
             self.names[name].is_clone = True
             self.names[self.uids[uid]].is_clone = True
-            self.uids.update({uid: name})
+            self.uids.update({uid: self.names[name]})
         else:
-            self.uids.update({uid: name})
+            self.uids.update({uid: self.names[name]})
 
     def clean(self):
         self.tmp = _Flat(self.path)
@@ -201,9 +201,10 @@ def match_moves(old, lcl, rmt)
 
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
+                # can move like normal
                 pass
             elif rmt.names[name].moved:
-                # check uids match
+                # need check uids match else conflict
                 pass
             elif name in old.names and lcl.uids[old.names[name].uid].moved:
                 mvd_lcl = lcl.uids[old.names[name].uid]
