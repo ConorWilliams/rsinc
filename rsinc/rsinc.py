@@ -188,6 +188,22 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     return track.count
 
 
+def recover_sync(lcl, rmt):
+    '''Basic sync, if files uids conflict keeps newest'''
+    for name, file in sorted(lcl.names.items()):
+        if file.synced:
+            continue
+        elif name in rmt.names:
+            if file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    push(name, name, lcl, rmt)
+                else:
+                    pull(name, name, lcl, rmt)
+            rmt.names[name].synced = True
+        else:
+            safe_push(name, name, lcl, rmt)
+
+
 def match_states(lcl, rmt):
     '''
     Basic sync given all moves performed. Uses LOGIC array do determine 
@@ -232,6 +248,12 @@ def match_moves(old, lcl, rmt):
                 # Uids match therefore both moved to same place in lcl and rmt.
                 rmt.names[name].synced = True
                 continue
+            elif rmt.names[name].moved:
+                # Conflict, two moves to same place in lcl and remote.
+                rmt.names[name].synced = True
+                file.state = UPDATED
+                rmt.names[name].state = UPDATED
+                continue
             elif name in old.names and lcl.uids[old.names[name].uid].moved:
                 # This deals with the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
@@ -243,8 +265,8 @@ def match_moves(old, lcl, rmt):
                 nn = safe_move(name, mvd_lcl.name, rmt)
                 balance_names(mvd_lcl.name, nn, lcl, rmt)
             else:
-                # Not deleted, not supposed to be moved. Therefore rename rmt 
-                # and procced with matching files move.
+                # Not deleted, not supposed to be moved, not been moved.
+                # Therefore rename rmt and procced with matching files move.
                 safe_move(name, name, rmt)
 
         trace, f_rmt = trace_rmt(file, old, rmt)
@@ -300,22 +322,6 @@ def trace_rmt(file, old, rmt):
         return trace, rmt_file
     else:
         return NOTHERE, None
-
-
-def recover_sync(lcl, rmt):
-    '''Basic sync, if files uids conflict keeps newest'''
-    for name, file in sorted(lcl.names.items()):
-        if file.synced:
-            continue
-        elif name in rmt.names:
-            if file.uid != rmt.names[name].uid:
-                if file.time > rmt.names[name].time:
-                    push(name, name, lcl, rmt)
-                else:
-                    pull(name, name, lcl, rmt)
-            rmt.names[name].synced = True
-        else:
-            safe_push(name, name, lcl, rmt)
 
 
 def balance_names(name_lcl, name_rmt, lcl, rmt):
