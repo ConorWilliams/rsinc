@@ -5,6 +5,7 @@ import os
 import subprocess
 import ujson as json
 import logging
+from copy import deepcopy
 from datetime import datetime
 
 from clint.textui import colored
@@ -25,45 +26,51 @@ log = logging.getLogger(__name__)
 
 
 class File():
-    def __init__(self, name, uid, time, state):
+    def __init__(self, name, uid, time, state, moved, is_clone, synced):
         self.name = name
         self.uid = uid
         self.time = time
+
         self.state = state
-        self.moved = False
-        self.is_clone = False
-        self.synced = False
+        self.moved = moved
+        self.is_clone = is_clone
+        self.synced = synced
+
+    def dump(self):
+        return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
 
 
-class _Flat():
+class Flat():
     def __init__(self, path):
         self.path = path
-        self.files = []
-        self.uids = {}
         self.names = {}
+        self.uids = {}
         self.lower = set({})
 
-    def update(self, name, uid, time, state=THESAME):
-        self.files.append(File(name, uid, time, state))
-        self.names.update({name: self.files[-1]})
+    def update(self, name, uid, time=0, state=THESAME, moved=False,
+               is_clone=False, synced=False):
+
+        self.names.update(
+            {name: File(name, uid, time, state, moved, is_clone, synced)})
         self.lower.add(name.lower())
 
         if uid in self.uids:
             self.names[name].is_clone = True
-            self.uids[uid].is_clone = True
+            self.names[self.uids[uid]].is_clone = True
+            self.uids.update({uid: self.names[name]})
         else:
-            self.uids.update({uid: self.files[-1]})
-
-
-class Flat(_Flat):
-    def __init__(self, path):
-        _Flat.__init__(self, path)
-        self.tmp = _Flat(path)
+            self.uids.update({uid: self.names[name]})
 
     def clean(self):
-        self.tmp = _Flat(self.path)
-        for file in self.files:
+        for file in self.names.values():
             file.synced = False
+
+    def rm(self, name):
+        if not self.names[name].is_clone:
+            del self.uids[self.names[name].uid]
+
+        del self.names[name]
+        self.lower.remove(name.lower())
 
 
 class Struct():
@@ -159,184 +166,114 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.count = 0
 
     if recover:
-        _recover(lcl, rmt)
-        _recover(rmt, lcl)
-    else:
-        _sync(old, lcl, rmt)
-        _sync(old, rmt, lcl)
+        recover_sync(lcl, rmt)
+        recover_sync(rmt, lcl)
 
-    lcl.clean()
-    rmt.clean()
+        lcl.clean()
+        rmt.clean()
+    else:
+        cp_lcl = deepcopy(lcl)
+        cp_rmt = deepcopy(rmt)
+
+        match_moves(old, cp_lcl, cp_rmt)
+        match_moves(old, cp_rmt, cp_lcl)
+
+        cp_lcl.clean()
+        cp_rmt.clean()
+
+        match_states(cp_lcl, cp_rmt)
+        match_states(cp_rmt, cp_lcl)
 
     return track.count
 
 
-def _recover(lcl, rmt):
-    for name, file in sorted(lcl.names.items()):
-        if file.synced:
-            continue
-        elif name in rmt.names:
-            if file.uid != rmt.names[name].uid:
-                if file.time > rmt.names[name].time:
-                    push(name, name, lcl, rmt)
-                else:
-                    pull(name, name, lcl, rmt)
-            rmt.names[name].synced = True
-        else:
-            safe_push(name, name, lcl, rmt)
-
-
-def _sync(old, lcl, rmt):
-    '''Normal sync function'''
-    do_logic = [(NOMOVE, NOMOVE), (NOMOVE, CLONE),
-                (CLONE, NOMOVE), (CLONE, CLONE)]
-    do_cnflct = [(MOVED, NOMOVE), (MOVED, CLONE), (CLONE, MOVED)]
-
+def match_states(lcl, rmt):
     for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
 
-        s = get_mv_state(file, rmt)
-        # print(lcl.path, name, s, file.state)  # DEBUG
+        file.synced = True
 
-        if s == (MOVED, NOMOVE):
-            if rmt.names[name].state == DELETED:
-                s = (MOVED, NOTHERE)
-            elif name in old.names and not rmt.names[name].is_clone:
-                # This deals with the degenerate double-move edge case
-                mvd_lcl = lcl.uids[old.names[name].uid]
-                tmv_rmt = rmt.names[name]
-                if mvd_lcl.moved:
-                    if not tmv_rmt.synced:
-                        tmv_rmt.synced = True
-                        mvd_lcl.synced = True
-                        nn = safe_move(name, mvd_lcl.name, rmt)
-                        nn = balance_names(mvd_lcl.name, nn, lcl, rmt)
-                        LOGIC[mvd_lcl.state][tmv_rmt.state](nn, nn, lcl, rmt)
-                    s = (MOVED, NOTHERE)
-
-        if s in do_logic:
+        if name in rmt.names:
             rmt.names[name].synced = True
             LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
-
-        elif s in do_cnflct:
-            rmt.names[name].synced = True
-            conflict(name, name, lcl, rmt)
-
-        elif s == (MOVED, MOVED):
-            rmt.names[name].synced = True
-            if file.uid != rmt.names[name].uid:
-                conflict(name, name, lcl, rmt)
-
-        elif s == (NOMOVE, MOVED):
-            if file.state == DELETED:
-                continue
-            else:
-                rmt.names[name].synced = True
-                conflict(name, name, lcl, rmt)
-
-        elif s == (CLONE, NOTHERE):
+        else:
             safe_push(name, name, lcl, rmt)
 
-        elif s == (NOMOVE, NOTHERE):
-            if file.state == DELETED:
-                # will hit MOVED:x in next pass if file to delete moved in rmt
+
+def match_moves(old, lcl, rmt):
+    names = list(lcl.names.keys())
+
+    for name in names:
+        if name not in lcl.names:
+            # Caused by degenerate, double-move edge case
+            continue
+        else:
+            file = lcl.names[name]
+
+        if file.synced or not file.moved:
+            continue
+
+        file.synced = True
+
+        if name in rmt.names:
+            if rmt.names[name].state == DELETED:
+                # Can move like normal
+                pass
+            elif file.uid == rmt.names[name].uid:
+                # Uids match therefore both moved to same place in lcl and rmt
                 continue
+            elif name in old.names and lcl.uids[old.names[name].uid].moved:
+                # This deals with the degenerate, double-move edge case
+                mvd_lcl = lcl.uids[old.names[name].uid]
+                tmv_rmt = rmt.names[name]
 
-            t, f_rmt = trace_rmt(file, old, rmt)
+                tmv_rmt.synced = True
+                mvd_lcl.synced = True
 
-            if t == MOVED:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl)
-                nn = balance_names(nn, f_rmt.name, lcl, rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
+                nn = safe_move(name, mvd_lcl.name, rmt)
+                balance_names(mvd_lcl.name, nn, lcl, rmt)
+            else:
+                # Not deleted, not not been moved there and not supposed to be
+                # moved therefore rename rmt and procced with move
+                safe_move(name, name, rmt)
 
-            elif t == CLONE or NOTHERE:
+        t, f_rmt = trace_rmt(file, old, rmt)
+
+        if t == NOMOVE:
+            f_rmt.synced = True
+
+            if f_rmt.state == DELETED:
+                # Delete shy
                 safe_push(name, name, lcl, rmt)
             else:
-                log.error(
-                    'Fell off S:N switch in _sync, t = %s, name = %s', t, name)
+                # Move pair in rmt
+                nn = safe_move(f_rmt.name, name, rmt)
+                balance_names(name, nn, lcl, rmt)
 
-        elif s == (MOVED, NOTHERE):
-            t, f_rmt = trace_rmt(file, old, rmt)
+        elif t == MOVED:
+            f_rmt.synced = True
+            nn = safe_move(name, f_rmt.name, lcl)
+            balance_names(nn, f_rmt.name, lcl, rmt)
 
-            if t == NOMOVE:
-                f_rmt.synced = True
-                if f_rmt.state == DELETED:
-                    delL(name, name, lcl, rmt)
-                else:
-                    nn = safe_move(f_rmt.name, name, rmt)
-                    nn = balance_names(name, nn, lcl, rmt)
-                    LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
-
-            elif t == MOVED:
-                f_rmt.synced = True
-                nn = safe_move(name, f_rmt.name, lcl)
-                nn = balance_names(nn, f_rmt.name, lcl, rmt)
-                LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
-
-            elif t == CLONE or NOTHERE:
-                safe_push(name, name, lcl, rmt)
-
-            else:
-                log.error(
-                    'Fell off M:N switch in _sync, t = %s, name = %s', t, name)
-        else:
-            log.error('Fell off switch in _sync, s = (%d,%d), name = %s',
-                      s[0], s[1], name)
-
-
-def get_mv_state(file, rmt):
-    if file.is_clone:
-        if file.state == CREATED:
-            i = CLONE
-        else:
-            i = NOMOVE
-    elif file.moved:
-        i = MOVED
-    else:
-        i = NOMOVE
-
-    if file.name not in rmt.names:
-        j = NOTHERE
-    else:
-        if rmt.names[file.name].is_clone:
-            if rmt.names[file.name].state == CREATED:
-                j = CLONE
-            else:
-                j = NOMOVE
-        elif rmt.names[file.name].moved:
-            j = MOVED
-        else:
-            j = NOMOVE
-
-    return (i, j)
+        elif t == CLONE or t == NOTHERE:
+            safe_push(name, name, lcl, rmt)
 
 
 def trace_rmt(file, old, rmt):
-    if file.state == CREATED:
-        # New files cant be traced, returning CLONE forces push
-        return CLONE, '?'
-
-    if file.moved:
-        old_file = old.uids[file.uid]
-        if old_file.is_clone:
-            # Can't track clones by uid, returning CLONE forces push
-            return CLONE, '?'
-    else:
-        old_file = old.names[file.name]
+    old_file = old.uids[file.uid]
 
     if old_file.name in rmt.names:
         rmt_file = rmt.names[old_file.name]
 
         if rmt.names[old_file.name].is_clone:
-            if mt.names[old_file.name].state == CREATED:
+            if rmt.names[old_file.name].state == CREATED:
                 trace = CLONE
             else:
                 trace = NOMOVE
             return trace, rmt_file
         elif rmt.names[old_file.name].moved:
-            # Do uid trace
+            # Do a uid trace
             pass
         else:
             return NOMOVE, rmt_file
@@ -353,6 +290,21 @@ def trace_rmt(file, old, rmt):
         return trace, rmt_file
     else:
         return NOTHERE, "?"
+
+
+def recover_sync(lcl, rmt):
+    for name, file in sorted(lcl.names.items()):
+        if file.synced:
+            continue
+        elif name in rmt.names:
+            if file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    push(name, name, lcl, rmt)
+                else:
+                    pull(name, name, lcl, rmt)
+            rmt.names[name].synced = True
+        else:
+            safe_push(name, name, lcl, rmt)
 
 
 def balance_names(name_lcl, name_rmt, lcl, rmt):
@@ -377,8 +329,6 @@ def balance_names(name_lcl, name_rmt, lcl, rmt):
     if nn_rmt != name_rmt:
         safe_move(name_rmt, nn_rmt, rmt)
 
-    return nn_lcl
-
 
 def resolve_case(name, flat):
     '''
@@ -391,10 +341,10 @@ def resolve_case(name, flat):
     new_name = name
 
     if track.case:
-        while new_name.lower() in flat.lower or new_name.lower() in flat.tmp.lower:
+        while new_name.lower() in flat.lower:
             new_name = prepend(new_name, '_')
     else:
-        while new_name in flat.names or new_name in flat.tmp.names:
+        while new_name in flat.names:
             new_name = prepend(new_name, '_')
 
     return new_name
@@ -403,8 +353,11 @@ def resolve_case(name, flat):
 def safe_push(name_s, name_d, flat_s, flat_d):
     nn = resolve_case(name_s, flat_d)
     push(name_s, nn, flat_s, flat_d)
-    nn = balance_names(name_s, nn, flat_s, flat_d)
-    flat_d.tmp.update(nn, 'null', 0)
+
+    cpd_dump = flat_s.names[name_s].dump()
+    flat_d.update(nn, *cpd_dump)
+
+    balance_names(name_s, nn, flat_s, flat_d)
 
 
 def safe_move(name_s, name_d, flat):
@@ -429,7 +382,9 @@ def safe_move(name_s, name_d, flat):
     else:
         print(info)
 
-    flat.tmp.update(nn_d, 'null', 0)
+    mvd_dump = flat.names[name_s].dump()
+    flat.rm(name_s)
+    flat.update(nn_d, *mvd_dump)
 
     return nn_d
 

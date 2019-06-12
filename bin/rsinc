@@ -63,9 +63,8 @@ def insert(nest, chain):
 def pack(flat):
     '''Converts flat, into packed dict'''
     nest = empty()
-    for file in flat.files:
-        chain = file.name.split(
-            '/') + [{'uid': file.uid, 'datetime': file.time}]
+    for name, file in flat.names.items():
+        chain = name.split('/') + [file.uid]
         insert(nest, chain)
 
     return nest
@@ -74,7 +73,7 @@ def pack(flat):
 def unpack(nest, flat, path=''):
     '''Converts packed dict, nest, into flat'''
     for k, v in nest['file'].items():
-        flat.update(path + k, v['uid'], v['datetime'])
+        flat.update(path + k, v)
 
     for k, v in nest['fold'].items():
         unpack(v, flat, path + k + '/')
@@ -145,6 +144,9 @@ parser.add_argument(
 
 
 args = parser.parse_args()
+dry_run = args.dry
+auto = args.auto
+recover = args.recovery
 
 
 # ****************************************************************************
@@ -179,36 +181,37 @@ grn = colored.green    # info
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 # Decide which folder(s) to sync
-CWD = os.getcwd()
-cwd = CWD.split('/')
-for elem in BASE_L.split('/')[:-1]:
-    if cwd[0] == elem:
-        cwd.pop(0)
-    else:
-        cwd = DEFAULT_DIRS
-        break
+cwd = os.getcwd()
+
+if args.default:
+    tmp = DEFAULT_DIRS
+elif len(args.folders) == 0:
+    tmp = [cwd]
 else:
-    if len(cwd) == 0:
-        cwd = DEFAULT_DIRS
+    tmp = [cwd + '/' + f for f in args.folders]
+
+folders = []
+
+for f in tmp:
+    if len(f) < len(BASE_L):
+        print('Rejecting', f, 'not in', BASE_L)
+        continue
+    for b, c in zip(BASE_L, f):
+        if b != c:
+            print('Rejecting', f, 'not in', BASE_L)
+            break
     else:
-        cwd = ['/'.join(cwd)]
+        folders.append(f[len(BASE_L):])
+
+if len(folders) == 0:
+    folders = DEFAULT_DIRS
+
 
 # Set up logging
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
                     level=logging.DEBUG,
                     datefmt='%H:%M:%S',
                     format='%(asctime)s %(levelname)s: %(message)s',)
-
-if args.default:
-    folders = DEFAULT_DIRS
-elif args.folders == []:
-    folders = cwd
-else:
-    folders = args.folders
-
-dry_run = args.dry
-auto = args.auto
-recover = args.recovery
 
 
 # ****************************************************************************
@@ -245,8 +248,6 @@ if os.path.exists(TEMP_FILE):
 
 for folder in folders:
     print('')
-    save = False
-
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
@@ -285,7 +286,7 @@ for folder in folders:
     print('Found:', total, 'job(s)')
 
     if not dry_run and (auto or total == 0 or strtobool[input('Execute? ')]):
-        if total != 0:
+        if total != 0 or recover:
             print(grn("Live pass:"))
 
             write(TEMP_FILE, {'folder': folder})
@@ -295,9 +296,8 @@ for folder in folders:
             # Merge into master and history clean up
             spin.start(grn('Saving: ') + qt(folder))
 
-            if total != 0:
-                merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
-                write(MASTER, master)
+            merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+            write(MASTER, master)
 
             subprocess.run(["rm", TEMP_FILE])
             spin.stop_and_persist(symbol='✔')
@@ -310,13 +310,13 @@ for folder in folders:
             history.update(folder + '/' + d['Path'] for d in dirs)
             write(HISTORY, history)
 
-        if args.clean:
-            spin.start(grn('Pruning: ') + qt(folder))
+    if args.clean:
+        spin.start(grn('Pruning: ') + qt(folder))
 
-            subprocess.run(["rclone", 'rmdirs', path_rmt])
-            subprocess.run(["rclone", 'rmdirs', path_lcl])
+        subprocess.run(["rclone", 'rmdirs', path_rmt])
+        subprocess.run(["rclone", 'rmdirs', path_lcl])
 
-            spin.stop_and_persist(symbol='✔')
+        spin.stop_and_persist(symbol='✔')
 
     recover = args.recovery
 
