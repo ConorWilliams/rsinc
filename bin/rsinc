@@ -64,7 +64,7 @@ def pack(flat):
     '''Converts flat, into packed dict'''
     nest = empty()
     for name, file in flat.names.items():
-        chain = name.split('/') + [{'uid': file.uid, 'datetime': file.time}]
+        chain = name.split('/') + [file.uid]
         insert(nest, chain)
 
     return nest
@@ -73,7 +73,7 @@ def pack(flat):
 def unpack(nest, flat, path=''):
     '''Converts packed dict, nest, into flat'''
     for k, v in nest['file'].items():
-        flat.update(path + k, v['uid'], v['datetime'])
+        flat.update(path + k, v)
 
     for k, v in nest['fold'].items():
         unpack(v, flat, path + k + '/')

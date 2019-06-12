@@ -46,7 +46,7 @@ class Flat():
         self.uids = {}
         self.lower = set({})
 
-    def update(self, name, uid, time, state=THESAME, moved=False,
+    def update(self, name, uid, time=0, state=THESAME, moved=False,
                is_clone=False, synced=False):
 
         self.names.update(
