@@ -188,14 +188,15 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 
 
 def match_moves(old, lcl, rmt)
-    names = set(lcl.names.keys())
+    names = list(lcl.names.keys())
 
-    new_lcl = Flat(lcl.path)
-    new_rmt = Flat(rmt.path)
+    for name in names:
+        if name not in lcl.names:
+            continue
+        else:
+            file = lcl.names[name]
 
-    for name, file in sorted(lcl.name.items()):
         if file.synced or not file.moved:
-            new_lcl.file_update(file, name)
             continue
 
         if name in rmt.names:
