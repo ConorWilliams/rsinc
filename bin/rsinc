@@ -172,7 +172,7 @@ HISTORY = config['HISTORY']
 strtobool = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
              '1': True, "0": False, 't': True, 'true': True, 'f': False,
              'false': False, 'Y': True, 'N': False, 'Yes': True, "No": False,
-             '': True}
+             '': False}
 
 ylw = colored.yellow   # warn
 red = colored.red      # error
