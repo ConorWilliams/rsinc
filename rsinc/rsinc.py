@@ -181,10 +181,24 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
         cp_lcl.clean()
         cp_rmt.clean()
 
-        sync_states(old, cp_lcl, cp_rmt)
-        sync_states(old, cp_rmt, cp_lcl)
+        match_states(old, cp_lcl, cp_rmt)
+        match_states(old, cp_rmt, cp_lcl)
 
     return track.count
+
+
+def match_states(lcl, rmt):
+    for name, file in sorted(lcl.names.items()):
+        if file.synced:
+            continue
+
+        file.synced = True
+
+        if name in rmt.names:
+            rmt.names[name].synced = True
+            LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
+        else:
+            safe_push(name, name, lcl, rmt)
 
 
 def match_moves(old, lcl, rmt)
@@ -192,6 +206,7 @@ def match_moves(old, lcl, rmt)
 
     for name in names:
         if name not in lcl.names:
+            # Caused by degenerate, double-move edge case
             continue
         else:
             file = lcl.names[name]
@@ -199,46 +214,47 @@ def match_moves(old, lcl, rmt)
         if file.synced or not file.moved:
             continue
 
+        file.synced = True
+
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
-                # can move like normal
+                # Can move like normal
                 pass
-            elif rmt.names[name].moved:
-                # need check uids match else conflict
-                pass
+            elif file.uid == rmt.names[name].uid:
+                # Uids match therefore both moved to same place in lcl and rmt
+                continue
             elif name in old.names and lcl.uids[old.names[name].uid].moved:
+                # This deals with the degenerate, double-move edge case
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 tmv_rmt = rmt.names[name]
-                if not tmv_rmt.synced:
-                    tmv_rmt.synced = True
-                    mvd_lcl.synced = True
-                    nn = safe_move(name, mvd_lcl.name, rmt)
-                    nn = balance_names(mvd_lcl.name, nn, lcl, rmt)
-                    new_lcl.file_update(mvd_lcl, nn)
-                    new_rmt.file_update(tmv_rmt, nn)
+
+                tmv_rmt.synced = True
+                mvd_lcl.synced = True
+
+                nn = safe_move(name, mvd_lcl.name, rmt)
+                balance_names(mvd_lcl.name, nn, lcl, rmt)
             else:
-                rmt.names[name].synced = True
-                file.state = CREATED
-                new_lcl.file_update(file, name)
-                continue
+                # Not deleted, not not been moved there and not supposed to be
+                # moved therefore rename rmt and procced with move
+                safe_move(name, name, rmt)
 
         t, f_rmt = trace(file, old, rmt)
 
         if t == NOMOVE:
             f_rmt.synced = True
             if f_rmt.state == DELETED:
-                nn = safe_push(name, name, lcl, rmt)
+                # Delete shy
+                safe_push(name, name, lcl, rmt)
             else:
                 nn = safe_move(f_rmt.name, name, rmt)
-                nn = balance_names(name, nn, lcl, rmt)
+                balance_names(name, nn, lcl, rmt)
 
         elif t == MOVED:
             f_rmt.synced = True
             nn = safe_move(name, f_rmt.name, lcl)
-            nn = balance_names(nn, f_rmt.name, lcl, rmt)
-            LOGIC[file.state][f_rmt.state](nn, nn, lcl, rmt)
+            balance_names(nn, f_rmt.name, lcl, rmt)
 
-        elif t == CLONE or NOTHERE:
+        elif t == CLONE or t == NOTHERE:
             safe_push(name, name, lcl, rmt)
 
 
@@ -249,13 +265,13 @@ def trace_rmt(file, old, rmt):
         rmt_file = rmt.names[old_file.name]
 
         if rmt.names[old_file.name].is_clone:
-            if mt.names[old_file.name].state == CREATED:
+            if rmt.names[old_file.name].state == CREATED:
                 trace = CLONE
             else:
                 trace = NOMOVE
             return trace, rmt_file
         elif rmt.names[old_file.name].moved:
-            # Do uid trace
+            # Do a uid trace
             pass
         else:
             return NOMOVE, rmt_file
@@ -311,8 +327,6 @@ def balance_names(name_lcl, name_rmt, lcl, rmt):
     if nn_rmt != name_rmt:
         safe_move(name_rmt, nn_rmt, rmt)
 
-    return nn_lcl
-
 
 def resolve_case(name, flat):
     '''
@@ -337,9 +351,11 @@ def resolve_case(name, flat):
 def safe_push(name_s, name_d, flat_s, flat_d):
     nn = resolve_case(name_s, flat_d)
     push(name_s, nn, flat_s, flat_d)
-    nn = balance_names(name_s, nn, flat_s, flat_d)
-    flat_d.tmp.update(nn, 'null', 0)
-    return nn
+
+    cpd_dump = flat_s.names[name_s].dump()
+    flat_d.update(nn_d, *mvd_dump)
+
+    balance_names(name_s, nn, flat_s, flat_d)
 
 
 def safe_move(name_s, name_d, flat):
