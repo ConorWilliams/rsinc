@@ -3,11 +3,11 @@
 
 import os
 import subprocess
-import ujson as json
 import logging
 from copy import deepcopy
 from datetime import datetime
 
+import ujson as json
 from clint.textui import colored
 
 cyn = colored.cyan     # in / to lcl

@@ -8,16 +8,16 @@ This is free software with ABSOLUTELY NO WARRANTY''')
 import argparse
 import os
 import subprocess
-import ujson as json
 import logging
 from datetime import datetime
 
+import ujson as json
 import halo
 from clint.textui import colored
 
 import rsinc
 
-CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config
+CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
 
 
 # ****************************************************************************
@@ -30,7 +30,7 @@ def qt(string):
 
 
 def read(file):
-    '''Reads json do dict and returns dict'''
+    '''Reads json do dict and returns dict.'''
     with open(file, 'r') as fp:
         d = json.load(fp)
 
@@ -44,12 +44,12 @@ def write(file, d):
 
 
 def empty():
-    '''Returns dict representing empty directory'''
+    '''Returns dict representing empty directory.'''
     return {'fold': {}, 'file': {}}
 
 
 def insert(nest, chain):
-    '''Inserts element at the end of the chain into packed dict, nest'''
+    '''Inserts element at the end of the chain into packed dict, nest.'''
     if len(chain) == 2:
         nest['file'].update({chain[0]: chain[1]})
         return
@@ -61,7 +61,7 @@ def insert(nest, chain):
 
 
 def pack(flat):
-    '''Converts flat, into packed dict'''
+    '''Converts flat, into packed dict.'''
     nest = empty()
     for name, file in flat.names.items():
         chain = name.split('/') + [file.uid]
@@ -71,7 +71,7 @@ def pack(flat):
 
 
 def unpack(nest, flat, path=''):
-    '''Converts packed dict, nest, into flat'''
+    '''Converts packed dict, nest, into flat.'''
     for k, v in nest['file'].items():
         flat.update(path + k, v)
 
@@ -80,7 +80,7 @@ def unpack(nest, flat, path=''):
 
 
 def _get_branch(nest, chain):
-    '''Returns packed dict at end of chain in packed dict, nest'''
+    '''Returns packed dict at end of chain in packed dict, nest.'''
     if len(chain) == 0:
         return nest
     else:
@@ -88,12 +88,12 @@ def _get_branch(nest, chain):
 
 
 def get_branch(nest, path):
-    '''Helper function for _get_branch, converts path to chain'''
+    '''Helper function for _get_branch, converts path to chain.'''
     return _get_branch(nest, path.split('/'))
 
 
 def _merge(nest, chain, new):
-    '''Merge packed dict, new, into packed dict, nest, at end of chain'''
+    '''Merge packed dict, new, into packed dict, nest, at end of chain.'''
     if len(chain) == 1:
         nest['fold'].update({chain[0]: new})
         return
@@ -105,12 +105,12 @@ def _merge(nest, chain, new):
 
 
 def merge(nest, path, new):
-    '''Helper function for _merge, converts path to chain'''
+    '''Helper function for _merge, converts path to chain.'''
     _merge(nest, path.split('/'), new)
 
 
 def _have(nest, chain):
-    '''Returns: true if chain is contained in packed dict, nest, else: false'''
+    '''Returns: true if chain is contained in packed dict, nest, else: false.'''
     if chain[0] in nest['fold']:
         if len(chain) == 1:
             return True
@@ -153,7 +153,7 @@ recover = args.recovery
 # *                           Definitions / Set-up                           *
 # ****************************************************************************
 
-
+# Read config and assign variables.
 if args.config == None:
     config = read(CONFIG_FILE)
 else:
@@ -180,7 +180,7 @@ grn = colored.green    # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
-# Decide which folder(s) to sync
+# Decide which folder(s) to sync.
 cwd = os.getcwd()
 
 if args.default:
@@ -195,9 +195,7 @@ else:
         else:
             tmp.append(cwd + '/' + f)
 
-
 folders = []
-
 for f in tmp:
     if len(f) < len(BASE_L):
         print('Rejecting', f, 'not in', BASE_L)
@@ -213,7 +211,7 @@ if len(folders) == 0:
     folders = DEFAULT_DIRS
 
 
-# Set up logging
+# Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
                     level=logging.DEBUG,
                     datefmt='%H:%M:%S',
@@ -230,7 +228,6 @@ if args.purge:
     write(MASTER, empty())
     write(HISTORY, set())
 
-# get the master structure
 if not os.path.exists(MASTER):
     print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
     write(MASTER, empty())
@@ -257,14 +254,14 @@ for folder in folders:
     path_lcl = BASE_L + folder + '/'
     path_rmt = BASE_R + folder + '/'
 
-    # Determine if first run
+    # Determine if first run.
     if folder in history:
         print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
     else:
         print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
         recover = True
 
-    # Scan directories
+    # Scan directories.
     spin.start(("Crawling: ") + qt(folder))
 
     lcl = rsinc.lsl(path_lcl, HASH_NAME)
@@ -273,7 +270,7 @@ for folder in folders:
 
     spin.stop_and_persist(symbol='✔')
 
-    # First run & recover mode
+    # First run & recover mode.
     if recover:
         print('Running', ylw('recover/first_sync'), 'mode')
     else:
@@ -284,7 +281,6 @@ for folder in folders:
         rsinc.calc_states(old, lcl)
         rsinc.calc_states(old, rmt)
 
-    # Main logic
     print(grn('Dry pass:'))
     total = rsinc.sync(lcl, rmt, old, recover,
                        dry_run=True, case=CASE_INSENSATIVE)
@@ -299,7 +295,7 @@ for folder in folders:
             rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
                        total=total, case=CASE_INSENSATIVE)
 
-            # Merge into master and history clean up
+            # Merge into master and clean up.
             spin.start(grn('Saving: ') + qt(folder))
 
             merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
@@ -309,6 +305,7 @@ for folder in folders:
             spin.stop_and_persist(symbol='✔')
 
         if recover:
+            # Merge into history.
             command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
             result = subprocess.Popen(command, stdout=subprocess.PIPE)
             dirs = json.load(result.stdout)
