@@ -35,7 +35,7 @@ class File():
         self.is_clone = is_clone
         self.synced = synced
 
-    def dump()
+    def dump():
         return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
 
 
@@ -61,8 +61,7 @@ class Flat():
             self.uids.update({uid: self.names[name]})
 
     def clean(self):
-        self.tmp = _Flat(self.path)
-        for file in self.files:
+        for file in self.names.values():
             file.synced = False
 
     def rm(name):
@@ -166,8 +165,8 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.count = 0
 
     if recover:
-        recover(lcl, rmt)
-        recover(rmt, lcl)
+        recover_sync(lcl, rmt)
+        recover_sync(rmt, lcl)
 
         lcl.clean()
         rmt.clean()
@@ -201,7 +200,7 @@ def match_states(lcl, rmt):
             safe_push(name, name, lcl, rmt)
 
 
-def match_moves(old, lcl, rmt)
+def match_moves(old, lcl, rmt):
     names = list(lcl.names.keys())
 
     for name in names:
@@ -290,7 +289,7 @@ def trace_rmt(file, old, rmt):
         return NOTHERE, "?"
 
 
-def recover(lcl, rmt):
+def recover_sync(lcl, rmt):
     for name, file in sorted(lcl.names.items()):
         if file.synced:
             continue
