@@ -5,13 +5,16 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 ## Features
 
 * Robust two-way syncing 
-* Tracks file moves
-* **Selective** syncing for improved speed
+* Tracks file moves and performs compound move/updates
+* **Selective** syncing for improved speed and fine control
 * Recovery mode
 * Dry-run mode 
 * Crash detection and recovery
+* Automatic first run detection and resolution
+* Uses file hashes to track changes
+* Case checking for clouds (OneDrive) that are case insensitive
 * Detailed logging
-* Case checking for clouds (onedrive) that are case insensitive
+
 
 ## Install/Setup
 
@@ -41,8 +44,8 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 }
 ```
 
-- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. 
-- `BASE_R` is the name of your rclone remote. 
+- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. **_Note_** `BASE_L` should include the trailing backslash as above. 
+- `BASE_R` is the name of your rclone remote. **_Note_** `BASE_L` should include the trailing colon (or backslash is you want root to be a sub folder in remote) as above.
 - `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true. 
 - `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags. 
 - `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
