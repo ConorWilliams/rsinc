@@ -178,19 +178,28 @@ grn = colored.green    # info
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 # Decide which folder(s) to sync
-CWD = os.getcwd()
-cwd = CWD.split('/')
-for elem in BASE_L.split('/')[:-1]:
-    if cwd[0] == elem:
-        cwd.pop(0)
-    else:
-        cwd = DEFAULT_DIRS
-        break
+cwd = os.getcwd()
+
+if len(args.folders) == 0:
+    tmp = [cwd + '/']
 else:
-    if len(cwd) == 0:
-        cwd = DEFAULT_DIRS
+    tmp = [cwd + '/' + f for f in args.folders]
+
+folders = []
+
+for f in tmp:
+    if len(f) < len(BASE_L):
+        print('Rejecting', f, 'not in', BASE_L)
+        continue
+    for b, c in zip(BASE_L, f):
+        if b != c:
+            print('Rejecting', f, 'not in', BASE_L)
+            break
     else:
-        cwd = ['/'.join(cwd)]
+        folders.append(f[len(BASE_L):])
+
+if len(folders) == 0:
+    folders = DEFAULT_DIRS
 
 # Set up logging
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),

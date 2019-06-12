@@ -35,7 +35,7 @@ class File():
         self.is_clone = is_clone
         self.synced = synced
 
-    def dump():
+    def dump(self):
         return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
 
 
@@ -180,8 +180,8 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
         cp_lcl.clean()
         cp_rmt.clean()
 
-        match_states(old, cp_lcl, cp_rmt)
-        match_states(old, cp_rmt, cp_lcl)
+        match_states(cp_lcl, cp_rmt)
+        match_states(cp_rmt, cp_lcl)
 
     return track.count
 
@@ -354,7 +354,7 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     push(name_s, nn, flat_s, flat_d)
 
     cpd_dump = flat_s.names[name_s].dump()
-    flat_d.update(nn_d, *mvd_dump)
+    flat_d.update(nn, *cpd_dump)
 
     balance_names(name_s, nn, flat_s, flat_d)
 
