@@ -5,6 +5,7 @@ import os
 import subprocess
 import ujson as json
 import logging
+from copy import deepcopy
 from datetime import datetime
 
 from clint.textui import colored
@@ -15,7 +16,7 @@ ylw = colored.yellow   # delete
 red = colored.red      # conflict
 
 THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
-NOMOVE, MOVED, CLONE, NOTHERE, MOVED_N, MOVED_U = tuple(range(6))
+NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4))
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class File():
         self.is_clone = is_clone
         self.synced = synced
 
+    def dump()
+        return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
+
 
 class Flat():
     def __init__(self, path):
@@ -42,7 +46,8 @@ class Flat():
         self.uids = {}
         self.lower = set({})
 
-    def update(self, name, uid, time, state=THESAME, moved=False, is_clone=False, synced=False):
+    def update(self, name, uid, time, state=THESAME, moved=False,
+               is_clone=False, synced=False):
 
         self.names.update(
             {name: File(uid, time, state, moved, is_clone, synced)})
@@ -51,6 +56,7 @@ class Flat():
         if uid in self.uids:
             self.names[name].is_clone = True
             self.names[self.uids[uid]].is_clone = True
+            self.uids.update({uid: name})
         else:
             self.uids.update({uid: name})
 
@@ -64,6 +70,7 @@ class Flat():
             del self.uids[self.names[name].uid]
 
         del self.names[name]
+        self.lower.remove(name.lower())
 
 
 class Struct():
@@ -161,14 +168,21 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     if recover:
         recover(lcl, rmt)
         recover(rmt, lcl)
-    else:
-        match_moves(old, lcl, rmt)
-        match_moves(old, rmt, lcl)
-        sync_states(old, lcl, rmt)
-        sync_states(old, rmt, lcl)
 
-    lcl.clean()
-    rmt.clean()
+        lcl.clean()
+        rmt.clean()
+    else:
+        cp_lcl = deepcopy(lcl)
+        cp_rmt = deepcopy(rmt)
+
+        match_moves(old, cp_lcl, cp_rmt)
+        match_moves(old, cp_rmt, cp_lcl)
+
+        cp_lcl.clean()
+        cp_rmt.clean()
+
+        sync_states(old, cp_lcl, cp_rmt)
+        sync_states(old, cp_rmt, cp_lcl)
 
     return track.count
 
@@ -309,10 +323,10 @@ def resolve_case(name, flat):
     new_name = name
 
     if track.case:
-        while new_name.lower() in flat.lower or new_name.lower() in flat.tmp.lower:
+        while new_name.lower() in flat.lower:
             new_name = prepend(new_name, '_')
     else:
-        while new_name in flat.names or new_name in flat.tmp.names:
+        while new_name in flat.names:
             new_name = prepend(new_name, '_')
 
     return new_name
@@ -348,7 +362,9 @@ def safe_move(name_s, name_d, flat):
     else:
         print(info)
 
-    flat.tmp.update(nn_d, 'null', 0)
+    mvd_dump = flat.names[name_s].dump()
+    flat.rm(name_s)
+    flat.update(nn_d, *mvd_dump)
 
     return nn_d
 
