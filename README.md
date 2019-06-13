@@ -57,7 +57,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not conver it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir.  
+Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 

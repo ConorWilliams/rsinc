@@ -170,8 +170,8 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     cp_rmt = deepcopy(rmt)
 
     if recover:
-        recover_sync(cp_lcl, cp_rmt)
-        recover_sync(cp_rmt, cp_lcl)
+        match_states(cp_lcl, cp_rmt, recover=True)
+        match_states(cp_rmt, cp_lcl, recover=True)
     else:
         match_moves(old, cp_lcl, cp_rmt)
         match_moves(old, cp_rmt, cp_lcl)
@@ -179,34 +179,22 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
         cp_lcl.clean()
         cp_rmt.clean()
 
-        match_states(cp_lcl, cp_rmt)
-        match_states(cp_rmt, cp_lcl)
+        match_states(cp_lcl, cp_rmt, recover=False)
+        match_states(cp_rmt, cp_lcl, recover=False)
 
     return track.count
 
 
-def recover_sync(lcl, rmt):
-    '''Basic sync, if files uids conflict keeps newest'''
-    for name, file in sorted(lcl.names.items()):
-        if file.synced:
-            continue
-        elif name in rmt.names:
-            if file.uid != rmt.names[name].uid:
-                if file.time > rmt.names[name].time:
-                    push(name, name, lcl, rmt)
-                else:
-                    pull(name, name, lcl, rmt)
-            rmt.names[name].synced = True
-        else:
-            safe_push(name, name, lcl, rmt)
-
-
-def match_states(lcl, rmt):
+def match_states(lcl, rmt, recover):
     '''
     Basic sync given all moves performed. Uses LOGIC array do determine 
-    actions, see bottom of file.
+    actions, see bottom of file. If recover keeps newest file.
     '''
-    for name, file in sorted(lcl.names.items()):
+    names = tuple(sorted(lcl.names.keys()))
+
+    for name in names:
+        file = lcl.names[name]
+
         if file.synced:
             continue
 
@@ -214,7 +202,14 @@ def match_states(lcl, rmt):
 
         if name in rmt.names:
             rmt.names[name].synced = True
-            LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
+            if not recover:
+                LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
+            else:
+                if file.uid != rmt.names[name].uid:
+                    if file.time > rmt.names[name].time:
+                        push(name, name, lcl, rmt)
+                    else:
+                        pull(name, name, lcl, rmt)
         elif file.state != DELETED:
             safe_push(name, name, lcl, rmt)
         else:
