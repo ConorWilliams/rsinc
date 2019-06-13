@@ -44,7 +44,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 if args.version:
-    exit(__version__)
+    print('')
+    exit('Version: ' + rsinc.__version__)
 
 dry_run = args.dry
 auto = args.auto
@@ -79,16 +80,12 @@ def write(file, d):
         json.dump(d, fp, sort_keys=True, indent=2)
 
 
-STB = {'yes': True, 'ye': True, 'y': True, 'n': False, 'no': False,
-       '1': True, "0": False, 't': True, 'true': True, 'f': False,
-       'false': False, '': False}
+STB = ('yes', 'ye', 'y', '1', 't', 'true', '', 'go', 'please', 'fire away',
+       'punch it', 'sure', 'ok', 'hell yes', )
 
 
 def strtobool(string):
-    if string.lower() in STB:
-        return STB[string.lower()]
-    else:
-        return 0
+    return string.lower() in STB
 
 
 def empty():
@@ -215,22 +212,15 @@ def main():
     else:
         tmp = []
         for f in args.folders:
-            if len(f) == 0:
-                tmp.append(BASE_L[:-1])
-            elif f[0] == '/':
-                tmp.append(f)
+            if os.path.isabs(f):
+                tmp.append(os.path.normpath(f))
             else:
-                tmp.append(cwd + '/' + f)
+                tmp.append(os.path.abspath(f))
 
     folders = []
     for f in tmp:
-        if len(f) < len(BASE_L) - 1:
+        if BASE_L not in f:
             print(ylw('Rejecting:'), f, 'not in', BASE_L)
-            continue
-        for b, c in zip(BASE_L, f):
-            if b != c:
-                print(ylw('Rejecting:'), f, 'not in', BASE_L)
-                break
         else:
             folders.append(f[len(BASE_L):])
 
