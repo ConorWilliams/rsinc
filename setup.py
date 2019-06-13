@@ -28,7 +28,7 @@ setuptools.setup(
     install_requires=['ujson', 'clint', 'halo'],
     entry_points={
         'console_scripts': [
-            'rsinc=rsinc.__main__.py',
+            'rsinc=rsinc.__main__:main',
         ],
     },
     python_requires='>=3',

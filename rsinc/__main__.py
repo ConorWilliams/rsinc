@@ -17,7 +17,43 @@ from clint.textui import colored
 
 import rsinc
 
-CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
+
+# ****************************************************************************
+# *                               Set-up/Parse                               *
+# ****************************************************************************
+
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("folders", help="Folders to sync", nargs='*')
+parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
+parser.add_argument("-c", "--clean", action="store_true",
+                    help="Clean directories")
+parser.add_argument("-D", "--default", help="Sync defaults",
+                    action="store_true")
+parser.add_argument("-r", "--recovery", action="store_true",
+                    help="Enter recovery mode")
+parser.add_argument("-a", "--auto", help="Don't ask permissions",
+                    action="store_true")
+parser.add_argument("-p", "--purge", help="Reset history for all folders",
+                    action="store_true")
+parser.add_argument("-v", "--version", help="Show version", action="store_true")
+parser.add_argument(
+    "--config", help="Path to config file (default ~/.rsinc/config.json)")
+
+args = parser.parse_args()
+
+if args.version:
+    exit(__version__)
+
+dry_run = args.dry
+auto = args.auto
+
+ylw = colored.yellow   # warn
+red = colored.red      # error
+grn = colored.green    # info
+
+spin = halo.Halo(spinner='dots', placement='right', color='yellow')
 
 
 # ****************************************************************************
@@ -133,40 +169,11 @@ def _have(nest, chain):
 
 
 # ****************************************************************************
-# *                             Parsing Arguments                            *
+# *                              Configuration                               *
 # ****************************************************************************
 
 
-parser = argparse.ArgumentParser()
-
-parser.add_argument("folders", help="Folders to sync", nargs='*')
-parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
-parser.add_argument("-c", "--clean", action="store_true",
-                    help="Clean directories")
-parser.add_argument("-D", "--default", help="Sync defaults",
-                    action="store_true")
-parser.add_argument("-r", "--recovery", action="store_true",
-                    help="Enter recovery mode")
-parser.add_argument("-a", "--auto", help="Don't ask permissions",
-                    action="store_true")
-parser.add_argument("-p", "--purge", help="Reset history for all folders",
-                    action="store_true")
-parser.add_argument("-v", "--version", help="Show version", action="store_true")
-parser.add_argument(
-    "--config", help="Path to config file (default ~/.rsinc/config.json)")
-
-if args.version:
-    exit(__version__)
-
-args = parser.parse_args()
-dry_run = args.dry
-auto = args.auto
-recover = args.recovery
-
-
-# ****************************************************************************
-# *                           Definitions / Set-up                           *
-# ****************************************************************************
+CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
 
 # Read config and assign variables.
 if args.config == None:
@@ -184,41 +191,6 @@ LOG_FOLDER = config['LOG_FOLDER']
 TEMP_FILE = config['TEMP_FILE']
 HISTORY = config['HISTORY']
 
-ylw = colored.yellow   # warn
-red = colored.red      # error
-grn = colored.green    # info
-
-spin = halo.Halo(spinner='dots', placement='right', color='yellow')
-
-# Decide which folder(s) to sync.
-cwd = os.getcwd()
-
-if args.default:
-    tmp = DEFAULT_DIRS
-elif len(args.folders) == 0:
-    tmp = [cwd]
-else:
-    tmp = []
-    for f in args.folders:
-        if len(f) == 0:
-            tmp.append(BASE_L[:-1])
-        elif f[0] == '/':
-            tmp.append(f)
-        else:
-            tmp.append(cwd + '/' + f)
-
-folders = []
-for f in tmp:
-    if len(f) < len(BASE_L) - 1:
-        print(ylw('Rejecting:'), f, 'not in', BASE_L)
-        continue
-    for b, c in zip(BASE_L, f):
-        if b != c:
-            print(ylw('Rejecting:'), f, 'not in', BASE_L)
-            break
-    else:
-        folders.append(f[len(BASE_L):])
-
 # Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
                     level=logging.DEBUG,
@@ -230,106 +202,140 @@ logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
 # *                               Main Program                               *
 # ****************************************************************************
 
+def main():
+    recover = args.recovery
 
-if args.purge:
-    print(ylw('WARN:'), 'Purging history of all folders')
-    write(MASTER, empty())
-    write(HISTORY, set())
+    # Decide which folder(s) to sync.
+    cwd = os.getcwd()
 
-if not os.path.exists(MASTER):
-    print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
-    write(MASTER, empty())
-
-if not os.path.exists(HISTORY):
-    print(ylw('WARN:'), HISTORY, 'missing')
-    write(HISTORY, set())
-
-master = read(MASTER)
-history = set(read(HISTORY))
-
-if os.path.exists(TEMP_FILE):
-    corrupt = read(TEMP_FILE)['folder']
-    if corrupt in folders:
-        folders.remove(corrupt)
-
-    folders.insert(0, corrupt)
-    recover = True
-    print(red('ERROR') + ', detected a crash, recovering', corrupt)
-    logging.warning('Detected crash, recovering %s', corrupt)
-
-for folder in folders:
-    print('')
-    path_lcl = BASE_L + folder + '/'
-    path_rmt = BASE_R + folder + '/'
-
-    # Determine if first run.
-    if folder in history:
-        print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
+    if args.default:
+        tmp = DEFAULT_DIRS
+    elif len(args.folders) == 0:
+        tmp = [cwd]
     else:
-        print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
+        tmp = []
+        for f in args.folders:
+            if len(f) == 0:
+                tmp.append(BASE_L[:-1])
+            elif f[0] == '/':
+                tmp.append(f)
+            else:
+                tmp.append(cwd + '/' + f)
+
+    folders = []
+    for f in tmp:
+        if len(f) < len(BASE_L) - 1:
+            print(ylw('Rejecting:'), f, 'not in', BASE_L)
+            continue
+        for b, c in zip(BASE_L, f):
+            if b != c:
+                print(ylw('Rejecting:'), f, 'not in', BASE_L)
+                break
+        else:
+            folders.append(f[len(BASE_L):])
+
+    if args.purge:
+        print(ylw('WARN:'), 'Purging history of all folders')
+        write(MASTER, empty())
+        write(HISTORY, set())
+
+    if not os.path.exists(MASTER):
+        print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
+        write(MASTER, empty())
+
+    if not os.path.exists(HISTORY):
+        print(ylw('WARN:'), HISTORY, 'missing')
+        write(HISTORY, set())
+
+    master = read(MASTER)
+    history = set(read(HISTORY))
+
+    if os.path.exists(TEMP_FILE):
+        corrupt = read(TEMP_FILE)['folder']
+        if corrupt in folders:
+            folders.remove(corrupt)
+
+        folders.insert(0, corrupt)
         recover = True
+        print(red('ERROR') + ', detected a crash, recovering', corrupt)
+        logging.warning('Detected crash, recovering %s', corrupt)
 
-    # Scan directories.
-    spin.start(("Crawling: ") + qt(folder))
+    for folder in folders:
+        print('')
+        path_lcl = BASE_L + folder + '/'
+        path_rmt = BASE_R + folder + '/'
 
-    lcl = rsinc.lsl(path_lcl, HASH_NAME)
-    rmt = rsinc.lsl(path_rmt, HASH_NAME)
-    old = rsinc.Flat('old')
+        # Determine if first run.
+        if folder in history:
+            print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
+        else:
+            print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
+            recover = True
 
-    spin.stop_and_persist(symbol='✔')
+        # Scan directories.
+        spin.start(("Crawling: ") + qt(folder))
 
-    # First run & recover mode.
-    if recover:
-        print('Running', ylw('recover/first_sync'), 'mode')
-    else:
-        print('Reading last state.')
-        branch = get_branch(master, folder)
-        unpack(branch, old)
-
-        rsinc.calc_states(old, lcl)
-        rsinc.calc_states(old, rmt)
-
-    print(grn('Dry pass:'))
-    total = rsinc.sync(lcl, rmt, old, recover,
-                       dry_run=True, case=CASE_INSENSATIVE)
-
-    print('Found:', total, 'job(s)')
-
-    if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
-        if total != 0 or recover:
-            print(grn("Live pass:"))
-
-            write(TEMP_FILE, {'folder': folder})
-            rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
-                       total=total, case=CASE_INSENSATIVE)
-
-            # Merge into master and clean up.
-            spin.start(grn('Saving: ') + qt(folder))
-
-            merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
-            write(MASTER, master)
-
-            subprocess.run(["rm", TEMP_FILE])
-            spin.stop_and_persist(symbol='✔')
-
-        if recover:
-            # Merge into history.
-            command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
-            result = subprocess.Popen(command, stdout=subprocess.PIPE)
-            dirs = json.load(result.stdout)
-            history.add(folder)
-            history.update(folder + '/' + d['Path'] for d in dirs)
-            write(HISTORY, history)
-
-    if args.clean:
-        spin.start(grn('Pruning: ') + qt(folder))
-
-        subprocess.run(["rclone", 'rmdirs', path_rmt])
-        subprocess.run(["rclone", 'rmdirs', path_lcl])
+        lcl = rsinc.lsl(path_lcl, HASH_NAME)
+        rmt = rsinc.lsl(path_rmt, HASH_NAME)
+        old = rsinc.Flat('old')
 
         spin.stop_and_persist(symbol='✔')
 
-    recover = args.recovery
+        # First run & recover mode.
+        if recover:
+            print('Running', ylw('recover/first_sync'), 'mode')
+        else:
+            print('Reading last state.')
+            branch = get_branch(master, folder)
+            unpack(branch, old)
 
-print('')
-print(grn("All synced!"))
+            rsinc.calc_states(old, lcl)
+            rsinc.calc_states(old, rmt)
+
+        print(grn('Dry pass:'))
+        total = rsinc.sync(lcl, rmt, old, recover,
+                           dry_run=True, case=CASE_INSENSATIVE)
+
+        print('Found:', total, 'job(s)')
+
+        if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
+            if total != 0 or recover:
+                print(grn("Live pass:"))
+
+                write(TEMP_FILE, {'folder': folder})
+                rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
+                           total=total, case=CASE_INSENSATIVE)
+
+                # Merge into master and clean up.
+                spin.start(grn('Saving: ') + qt(folder))
+
+                merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+                write(MASTER, master)
+
+                subprocess.run(["rm", TEMP_FILE])
+                spin.stop_and_persist(symbol='✔')
+
+                # Merge into history.
+                command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
+                result = subprocess.Popen(command, stdout=subprocess.PIPE)
+                dirs = json.load(result.stdout)
+                history.add(folder)
+                history.update(folder + '/' + d['Path'] for d in dirs)
+                write(HISTORY, history)
+
+        if args.clean:
+            spin.start(grn('Pruning: ') + qt(folder))
+
+            subprocess.run(["rclone", 'rmdirs', path_rmt])
+            subprocess.run(["rclone", 'rmdirs', path_lcl])
+
+            spin.stop_and_persist(symbol='✔')
+
+        recover = args.recovery
+
+    print('')
+    print(grn("All synced!"))
+
+
+if __name__ == '__main__':
+    main()
