@@ -233,7 +233,7 @@ def match_moves(old, lcl, rmt):
 
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
-                # Can move like normal but will trigger rename and may trigger 
+                # Can move like normal but will trigger rename and may trigger
                 # unpaired delete warn.
                 pass
             elif file.uid == rmt.names[name].uid:
@@ -255,7 +255,7 @@ def match_moves(old, lcl, rmt):
                 mvd_lcl.synced = True
 
                 nn = safe_move(name, mvd_lcl.name, rmt)
-                balance_names(mvd_lcl.name, nn, lcl, rmt)
+                balance(mvd_lcl.name, nn, lcl, rmt)
             else:
                 # Not deleted, not supposed to be moved, not been moved.
                 # Therefore rename rmt and procced with matching files move.
@@ -272,12 +272,12 @@ def match_moves(old, lcl, rmt):
             else:
                 # Move complimentary in rmt.
                 nn = safe_move(f_rmt.name, name, rmt)
-                balance_names(name, nn, lcl, rmt)
+                balance(name, nn, lcl, rmt)
 
         elif trace == MOVED:
             f_rmt.synced = True
             nn = safe_move(name, f_rmt.name, lcl)
-            balance_names(nn, f_rmt.name, lcl, rmt)
+            balance(nn, f_rmt.name, lcl, rmt)
 
         elif trace == CLONE or trace == NOTHERE:
             safe_push(name, name, lcl, rmt)
@@ -319,7 +319,7 @@ def trace_rmt(file, old, rmt):
         return NOTHERE, None
 
 
-def balance_names(name_lcl, name_rmt, lcl, rmt):
+def balance(name_lcl, name_rmt, lcl, rmt):
     '''
     Used to match names when a case-conflict-rename generates name 
     differences between local and remote.
@@ -328,7 +328,7 @@ def balance_names(name_lcl, name_rmt, lcl, rmt):
     nn_rmt = name_rmt
 
     while nn_lcl != nn_rmt:
-        if len(nn_lcl) > len(nn_rmt):
+        if len(nn_lcl.split('/')[-1]) > len(nn_rmt.split('/')[-1]):
             nn_rmt = nn_lcl
         else:
             nn_lcl = nn_rmt
@@ -373,7 +373,7 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     cpd_dump = flat_s.names[name_s].dump()
     flat_d.update(nn, *cpd_dump)
 
-    balance_names(name_s, nn, flat_s, flat_d)
+    balance(name_s, nn, flat_s, flat_d)
 
 
 def safe_move(name_s, name_d, flat):
