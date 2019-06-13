@@ -27,7 +27,8 @@ Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 
 Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like this by default:
 
-```json {
+```json { 
+ {
     "BASE_L": "/home/conor/",
     "BASE_R": "onedrive:",
     "CASE_INSENSATIVE": true,
