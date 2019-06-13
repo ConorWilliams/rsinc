@@ -13,6 +13,7 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 * Automatic first run detection and resolution
 * Uses file hashes to track changes
 * Case checking for clouds (OneDrive) that are case insensitive
+* Colourful CLI
 * Detailed logging
 
 
@@ -44,8 +45,8 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 }
 ```
 
-- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. **_Note_** `BASE_L` should include the trailing backslash as above. 
-- `BASE_R` is the name of your rclone remote. **_Note_** `BASE_L` should include the trailing colon (or backslash is you want root to be a sub folder in remote) as above.
+- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. Note `BASE_L` **_should_** include the trailing backslash as above. 
+- `BASE_R` is the name of your rclone remote. Note `BASE_L` **_should_** include the trailing colon (or backslash is you want root to be a sub folder in remote) as above.
 - `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true. 
 - `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags. 
 - `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
@@ -56,7 +57,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not conver it to a relative path. If any of the paths do not exist in in either local or remote rsinc will mkdir.  
+Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not conver it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
