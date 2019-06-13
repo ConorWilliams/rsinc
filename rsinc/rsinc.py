@@ -204,12 +204,11 @@ def match_states(lcl, rmt, recover):
             rmt.names[name].synced = True
             if not recover:
                 LOGIC[file.state][rmt.names[name].state](name, name, lcl, rmt)
-            else:
-                if file.uid != rmt.names[name].uid:
-                    if file.time > rmt.names[name].time:
-                        push(name, name, lcl, rmt)
-                    else:
-                        pull(name, name, lcl, rmt)
+            elif file.uid != rmt.names[name].uid:
+                if file.time > rmt.names[name].time:
+                    push(name, name, lcl, rmt)
+                else:
+                    pull(name, name, lcl, rmt)
         elif file.state != DELETED:
             safe_push(name, name, lcl, rmt)
         else:
@@ -234,7 +233,8 @@ def match_moves(old, lcl, rmt):
 
         if name in rmt.names:
             if rmt.names[name].state == DELETED:
-                # Can move like normal but will trigger rename.
+                # Can move like normal but will trigger rename and may trigger 
+                # unpaired delete warn.
                 pass
             elif file.uid == rmt.names[name].uid:
                 # Uids match therefore both moved to same place in lcl and rmt.
@@ -284,7 +284,10 @@ def match_moves(old, lcl, rmt):
 
 
 def trace_rmt(file, old, rmt):
-    '''Finds state of 'file' (a file moved in lcl) in rmt.'''
+    '''
+    Finds state of 'file' (a file moved in lcl) in rmt. Returns NOMOVE, MOVED, 
+    CLONE or NOTHERE and the file in rmt related to 'file' in lcl.
+    '''
     old_file = old.uids[file.uid]
 
     if old_file.name in rmt.names:
