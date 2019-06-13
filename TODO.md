@@ -10,6 +10,7 @@ Near:
 - [x] Update readme
 - [x] Complete readme
 - [x] Separate moving and basic syncing into two functions.
+- [x] Add move/rename detection for printing
 - [ ] Document edge cases
 
 

@@ -392,11 +392,17 @@ def safe_move(name_s, name_d, flat):
     elif base == track.rmt:
         col = mgt
 
-    info = col('Move:') + ' (%s) ' % base + name_s + col(' to: ') + nn_d
+    if os.path.split(name_s)[0] == os.path.split(name_d)[0]:
+        text = 'Rename:'
+    else:
+        text = "Move:"
+
+    info = col(text) + ' (%s) ' % base + name_s + col(' to: ') + nn_d
+    text = text.ljust(10)
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('MOVE:     (%s) %s TO %s', base, name_s, nn_d)
+        log.info('%s(%s) %s TO %s', text.upper(), base, name_s, nn_d)
         subprocess.run(['rclone', 'moveto', base + name_s, base + nn_d])
     else:
         print(info)
@@ -414,18 +420,19 @@ def push(name_s, name_d, flat_s, flat_d):
     track.count += 1
 
     if flat_s.path == track.lcl and flat_d.path == track.rmt:
-        text = 'Push'
+        text = 'Push:'
         col = mgt
 
     elif flat_s.path == track.rmt and flat_d.path == track.lcl:
-        text = 'Pull'
+        text = 'Pull:'
         col = cyn
 
-    info = col('%s: ' % text) + name_d
+    info = col('%s ' % text) + name_d
+    text = text.ljust(10)
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('%s:     %s', text.upper(), name_d)
+        log.info('%s%s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
         subprocess.run(cmd)
     else:
