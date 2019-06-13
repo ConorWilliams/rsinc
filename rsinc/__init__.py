@@ -1,4 +1,7 @@
-from rsinc.rsinc import sync
-from rsinc.rsinc import lsl
-from rsinc.rsinc import Flat
-from rsinc.rsinc import calc_states
+from .rsinc import sync
+from .rsinc import lsl
+from .rsinc import Flat
+from .rsinc import calc_states
+
+__version__ = "2.1-dev"
+__author__ = "ConorWilliams"

@@ -10,13 +10,15 @@ import os
 import json
 import subprocess
 
+import rsinc
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
     name="rsinc",
-    version="2.0",
-    author="ConorWilliams",
+    version=rsinc.__version__,
+    author=rsinc.__author__,
     author_email="conorwilliams@outlook.com",
     description="A tiny, hackable, two-way cloud synchronisation client for Linux",
     long_description=long_description,
@@ -24,7 +26,11 @@ setuptools.setup(
     url="https://github.com/ConorWilliams/rsinc",
     packages=setuptools.find_packages(),
     install_requires=['ujson', 'clint', 'halo'],
-    scripts=['bin/rsinc'],
+    entry_points={
+        'console_scripts': [
+            'rsinc=rsinc.__main__.py',
+        ],
+    },
     python_requires='>=3',
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",

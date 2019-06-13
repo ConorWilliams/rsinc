@@ -151,9 +151,12 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
                     action="store_true")
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
+parser.add_argument("-v", "--version", help="Show version", action="store_true")
 parser.add_argument(
     "--config", help="Path to config file (default ~/.rsinc/config.json)")
 
+if args.version:
+    exit(__version__)
 
 args = parser.parse_args()
 dry_run = args.dry
