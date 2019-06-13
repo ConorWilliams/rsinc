@@ -1,6 +1,5 @@
 from .rsinc import sync
 from .rsinc import lsl
-from .rsinc import find_ignores
 from .rsinc import build_regexs
 from .rsinc import calc_states
 

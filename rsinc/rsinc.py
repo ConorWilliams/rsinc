@@ -5,7 +5,6 @@ import os
 import subprocess
 import logging
 import re
-import glob
 from copy import deepcopy
 from datetime import datetime
 
@@ -87,27 +86,25 @@ class Struct():
 
 track = Struct()  # global used to track how many operations sync needs.
 
+
 # ****************************************************************************
 # *                                 Functions                                *
 # ****************************************************************************
 
 
-def find_ignores(BASE_L):
-    search = os.path.normpath(BASE_L + "/**/.rignore")
-    return glob.glob(search, recursive=True)
-
-
 def build_regexs(path, files):
     regex = []
+    plain = []
 
     for file in files:
         base = os.path.split(file)[0][len(path):]
 
         for line in open(file):
             r = os.path.join(base, line.rstrip())
+            plain.append(r)
             regex.append(re.compile(r))
 
-    return(regex)
+    return regex, plain
 
 
 def lsl(path, hash_name, regex=[]):

@@ -9,6 +9,7 @@ import argparse
 import os
 import subprocess
 import logging
+import glob
 from datetime import datetime
 
 import ujson as json
@@ -225,6 +226,18 @@ def main():
         else:
             folders.append(f[len(BASE_L):])
 
+    # Find all the ignore files in lcl.
+    if IGNORE:
+        search = os.path.normpath(BASE_L + "/**/.rignore")
+        ignores = glob.glob(search, recursive=True)
+
+        if len(ignores) != 0:
+            regexs, plain = rsinc.build_regexs(BASE_L, ignores)
+            print("Ignoring:", plain)
+    else:
+        ignores = []
+
+    # Get & read master/history.
     if args.purge:
         print(ylw('WARN:'), 'Purging history of all folders')
         write(MASTER, empty())
@@ -241,6 +254,7 @@ def main():
     master = read(MASTER)
     history = set(read(HISTORY))
 
+    # Detect crashes.
     if os.path.exists(TEMP_FILE):
         corrupt = read(TEMP_FILE)['folder']
         if corrupt in folders:
@@ -251,10 +265,7 @@ def main():
         print(red('ERROR') + ', detected a crash, recovering', corrupt)
         logging.warning('Detected crash, recovering %s', corrupt)
 
-    if IGNORE:
-        ignores = rsinc.find_ignores(BASE_L)
-        print(ignores)
-
+    # Main loop.
     for folder in folders:
         print('')
         path_lcl = BASE_L + folder + '/'
@@ -267,21 +278,17 @@ def main():
             print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
             recover = True
 
+        # Build relative regular expressions
+        regexs, plain = rsinc.build_regexs(path_lcl, ignores)
+
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
-
-        if IGNORE:
-            regexs = rsinc.build_regexs(path_lcl, ignores)
-        else:
-            regexs = []
 
         lcl = rsinc.lsl(path_lcl, HASH_NAME, regexs)
         rmt = rsinc.lsl(path_rmt, HASH_NAME, regexs)
         old = rsinc.Flat('old')
 
         spin.stop_and_persist(symbol='✔')
-
-        print(regexs)
 
         # First run & recover mode.
         if recover:
