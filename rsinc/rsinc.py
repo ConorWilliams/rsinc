@@ -93,6 +93,11 @@ track = Struct()  # global used to track how many operations sync needs.
 
 
 def build_regexs(path, files):
+    '''
+    Builds a list of relative regular expressions used in lsl to exclude files 
+    from syncing takes as arguments: 'path' that will be  lsl'd and 'files' list
+    of path to .rignore files.
+    '''
     regex = []
     plain = []
 
@@ -101,13 +106,14 @@ def build_regexs(path, files):
 
         for line in open(file):
             r = os.path.join(base, line.rstrip())
+            r = os.path.normpath(r)
             plain.append(r)
             regex.append(re.compile(r))
 
     return regex, plain
 
 
-def lsl(path, hash_name, regex=[]):
+def lsl(path, hash_name, regexs=[]):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
     uid and last modified time.
@@ -120,7 +126,7 @@ def lsl(path, hash_name, regex=[]):
 
     out = Flat(path)
     for d in list_of_dicts:
-        if any(r.match(d['Path']) for r in regex):
+        if any(r.match(d['Path']) for r in regexs):
             continue
         else:
             time = d['ModTime'][:19]
