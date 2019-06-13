@@ -4,6 +4,8 @@
 import os
 import subprocess
 import logging
+import re
+import glob
 from copy import deepcopy
 from datetime import datetime
 
@@ -90,7 +92,25 @@ track = Struct()  # global used to track how many operations sync needs.
 # ****************************************************************************
 
 
-def lsl(path, hash_name, ignore=[]):
+def find_ignores(BASE_L):
+    search = os.path.normpath(BASE_L + "/**/.rignore")
+    return glob.glob(search, recursive=True)
+
+
+def build_regexs(path, files):
+    regex = []
+
+    for file in files:
+        base = os.path.split(file)[0][len(path):]
+
+        for line in open(file):
+            r = os.path.join(base, line.rstrip())
+            regex.append(re.compile(r))
+
+    return(regex)
+
+
+def lsl(path, hash_name, regex=[]):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
     uid and last modified time.
@@ -103,9 +123,8 @@ def lsl(path, hash_name, ignore=[]):
 
     out = Flat(path)
     for d in list_of_dicts:
-        for substring in ignore:
-            if substring in d['Path']:
-                break
+        if any(r.match(d['Path']) for r in regex):
+            continue
         else:
             time = d['ModTime'][:19]
             time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()

@@ -251,6 +251,10 @@ def main():
         print(red('ERROR') + ', detected a crash, recovering', corrupt)
         logging.warning('Detected crash, recovering %s', corrupt)
 
+    if IGNORE:
+        ignores = rsinc.find_ignores(BASE_L)
+        print(ignores)
+
     for folder in folders:
         print('')
         path_lcl = BASE_L + folder + '/'
@@ -266,11 +270,18 @@ def main():
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
 
-        lcl = rsinc.lsl(path_lcl, HASH_NAME, IGNORE)
-        rmt = rsinc.lsl(path_rmt, HASH_NAME, IGNORE)
+        if IGNORE:
+            regexs = rsinc.build_regexs(path_lcl, ignores)
+        else:
+            regexs = []
+
+        lcl = rsinc.lsl(path_lcl, HASH_NAME, regexs)
+        rmt = rsinc.lsl(path_rmt, HASH_NAME, regexs)
         old = rsinc.Flat('old')
 
         spin.stop_and_persist(symbol='✔')
+
+        print(regexs)
 
         # First run & recover mode.
         if recover:
