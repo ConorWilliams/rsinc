@@ -90,7 +90,7 @@ track = Struct()  # global used to track how many operations sync needs.
 # ****************************************************************************
 
 
-def lsl(path, hash_name):
+def lsl(path, hash_name, ignore=[]):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
     uid and last modified time.
@@ -103,14 +103,17 @@ def lsl(path, hash_name):
 
     out = Flat(path)
     for d in list_of_dicts:
-        time = d['ModTime'][:19]
-        time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
+        for substring in ignore:
+            if substring in d['Path']:
+                break
+        else:
+            time = d['ModTime'][:19]
+            time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
-        hashsize = str(d['Size'])
-        hashsize += d['Hashes'][hash_name]
+            hashsize = str(d['Size'])
+            hashsize += d['Hashes'][hash_name]
 
-        out.update(d['Path'], hashsize, time)
-
+            out.update(d['Path'], hashsize, time)
     return out
 
 

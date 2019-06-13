@@ -187,6 +187,7 @@ MASTER = config['MASTER']
 LOG_FOLDER = config['LOG_FOLDER']
 TEMP_FILE = config['TEMP_FILE']
 HISTORY = config['HISTORY']
+IGNORE = config['IGNORE']
 
 # Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
@@ -265,8 +266,8 @@ def main():
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
 
-        lcl = rsinc.lsl(path_lcl, HASH_NAME)
-        rmt = rsinc.lsl(path_rmt, HASH_NAME)
+        lcl = rsinc.lsl(path_lcl, HASH_NAME, IGNORE)
+        rmt = rsinc.lsl(path_rmt, HASH_NAME, IGNORE)
         old = rsinc.Flat('old')
 
         spin.stop_and_persist(symbol='✔')
