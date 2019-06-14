@@ -6,5 +6,5 @@ from .rsinc import calc_states
 from .rsinc import Flat
 
 
-__version__ = "2.3-dev"
+__version__ = "2.3-stable"
 __author__ = "ConorWilliams"
