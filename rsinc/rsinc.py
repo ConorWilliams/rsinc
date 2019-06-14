@@ -105,10 +105,11 @@ def build_regexs(path, files):
         if os.path.exists(file):
             base = os.path.split(file)[0][len(path):]
 
-            for line in open(file):
-                r = os.path.join(base, line.rstrip())
-                plain.append(r)
-                regex.append(re.compile(r))
+            with open(file, 'r') as fp:
+                for line in fp:
+                    r = os.path.join(base, line.rstrip())
+                    plain.append(r)
+                    regex.append(re.compile(r))
 
     return regex, plain
 
