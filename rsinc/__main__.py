@@ -188,7 +188,6 @@ DEFAULT_DIRS = config['DEFAULT_DIRS']
 LOG_FOLDER = config['LOG_FOLDER']
 HASH_NAME = config['HASH_NAME']
 TEMP_FILE = config['TEMP_FILE']
-IGNORE = config['IGNORE']
 MASTER = config['MASTER']
 BASE_R = config['BASE_R']
 BASE_L = config['BASE_L']
@@ -321,7 +320,8 @@ def main():
                 history.update(folder + '/' + d['Path'] for d in dirs)
 
                 # Merge into nest and clean up.
-                merge(nest, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+                merge(nest, folder, pack(
+                    rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)))
                 write(MASTER, (history, ignores, nest))
                 subprocess.run(["rm", TEMP_FILE])
 

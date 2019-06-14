@@ -102,12 +102,13 @@ def build_regexs(path, files):
     plain = []
 
     for file in files:
-        base = os.path.split(file)[0][len(path):]
+        if os.path.exists(file):
+            base = os.path.split(file)[0][len(path):]
 
-        for line in open(file):
-            r = os.path.join(base, line.rstrip())
-            plain.append(r)
-            regex.append(re.compile(r))
+            for line in open(file):
+                r = os.path.join(base, line.rstrip())
+                plain.append(r)
+                regex.append(re.compile(r))
 
     return regex, plain
 

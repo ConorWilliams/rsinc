@@ -51,8 +51,7 @@ defult_config = {'BASE_R': 'onedrive:',
                                   os.path.expanduser("~/py"), ],
                  'LOG_FOLDER': DRIVE_DIR + 'logs/',
                  'MASTER': DRIVE_DIR + 'master.json',
-                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp',
-                 'HISTORY': DRIVE_DIR + 'history.json', }
+                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp', }
 
 if not os.path.exists(DRIVE_DIR):
     subprocess.run(['mkdir', DRIVE_DIR])
