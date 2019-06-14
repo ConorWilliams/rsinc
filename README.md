@@ -76,7 +76,7 @@ The optional arguments available are:
 *  -r, --recover-y, force recovery mode.
 *  -a, --auto, automatically applies changes without requesting permission.
 *  -p, --purge, deletes the master file resulting in a **total reset** of all tracking.
-*  -i, --ignore, find .rignore files and add them to the ignore list. Flag must be set to find new .rignore files.
+*  -i, --ignore, find `.rignore` files and add them to the ignore list. Flag must be set to find new `.rignore` files.
 *  --config, enter path to a config file, defaults to `~/.rsinc/config.json`.
 
 ## Details
@@ -116,7 +116,7 @@ Running rsinc with the `-i` flag will trigger a recursive search through `BASE_L
 * `[^/]*.txt` - ignore any text file in `~/path/` but not in sub directories.
 * `(?!.*.py$)` - recursively ignore everything in `~/path/` unless it ends with `.py` i.e. is a python source file.
 
-If any of the regular expressions match a files path it will be ignored. If you make a new `.rignore` file (but not if you update one) you will need to run rsinc with the `-i` flag to fetch new ignore files.
+If any of the regular expressions match a files path it will be ignored. If you make a new `.rignore` file (but not if you update one) you will need to run rsinc with the `-i` flag to fetch new ignore files. It is more efficient to selectively sync the folders you want syncing than to run rsinc on a higher level directory with many ignores.
 
 ### Logging
 
