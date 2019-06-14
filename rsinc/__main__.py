@@ -38,9 +38,13 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
                     action="store_true")
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
-parser.add_argument("-v", "--version", help="Show version", action="store_true")
-parser.add_argument(
-    "--config", help="Path to config file (default ~/.rsinc/config.json)")
+parser.add_argument("-i", "--ignore",
+                    help="Show all of the .rignore regular expressions and exit",
+                    action="store_true")
+parser.add_argument("-v", "--version",
+                    help="Show version and exit", action="store_true")
+parser.add_argument("--config",
+                    help="Path to config file (default ~/.rsinc/config.json)")
 
 args = parser.parse_args()
 
@@ -179,16 +183,16 @@ if args.config == None:
 else:
     config = read(args.config)
 
-BASE_R = config['BASE_R']
-BASE_L = config['BASE_L']
 CASE_INSENSATIVE = config['CASE_INSENSATIVE']
-HASH_NAME = config['HASH_NAME']
 DEFAULT_DIRS = config['DEFAULT_DIRS']
-MASTER = config['MASTER']
 LOG_FOLDER = config['LOG_FOLDER']
+HASH_NAME = config['HASH_NAME']
 TEMP_FILE = config['TEMP_FILE']
 HISTORY = config['HISTORY']
 IGNORE = config['IGNORE']
+MASTER = config['MASTER']
+BASE_R = config['BASE_R']
+BASE_L = config['BASE_L']
 
 # Set up logging.
 logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
@@ -202,6 +206,9 @@ logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
 # ****************************************************************************
 
 def main():
+    '''
+    Entry point for 'rsinc' as terminal command.
+    '''
     recover = args.recovery
 
     # Decide which folder(s) to sync.
@@ -231,9 +238,10 @@ def main():
         search = os.path.normpath(BASE_L + "/**/.rignore")
         ignores = glob.glob(search, recursive=True)
 
-        if len(ignores) != 0:
+        if args.ignore:
             regexs, plain = rsinc.build_regexs(BASE_L, ignores)
             print("Ignoring:", plain)
+            exit()
     else:
         ignores = []
 

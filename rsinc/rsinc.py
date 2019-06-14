@@ -106,7 +106,6 @@ def build_regexs(path, files):
 
         for line in open(file):
             r = os.path.join(base, line.rstrip())
-            r = os.path.normpath(r)
             plain.append(r)
             regex.append(re.compile(r))
 
@@ -116,7 +115,8 @@ def build_regexs(path, files):
 def lsl(path, hash_name, regexs=[]):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
-    uid and last modified time.
+    uid and last modified time. Checks each file name/path against a list of 
+    regular expressions causing it to be ignored if matching.
     '''
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
