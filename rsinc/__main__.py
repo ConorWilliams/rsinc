@@ -39,7 +39,7 @@ parser.add_argument("-a", "--auto", help="Don't ask permissions",
 parser.add_argument("-p", "--purge", help="Reset history for all folders",
                     action="store_true")
 parser.add_argument("-i", "--ignore",
-                    help="Show all of the .rignore regular expressions and exit",
+                    help="Find .rignore and add their contents to ignore list",
                     action="store_true")
 parser.add_argument("-v", "--version",
                     help="Show version and exit", action="store_true")
@@ -188,7 +188,6 @@ DEFAULT_DIRS = config['DEFAULT_DIRS']
 LOG_FOLDER = config['LOG_FOLDER']
 HASH_NAME = config['HASH_NAME']
 TEMP_FILE = config['TEMP_FILE']
-HISTORY = config['HISTORY']
 IGNORE = config['IGNORE']
 MASTER = config['MASTER']
 BASE_R = config['BASE_R']
@@ -233,34 +232,22 @@ def main():
         else:
             folders.append(f[len(BASE_L):])
 
-    # Find all the ignore files in lcl.
-    if IGNORE:
+    # Get & read master.
+    if args.purge or not os.path.exists(MASTER):
+        print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
+        write(MASTER, [[], [], empty()])
+
+    history, ignores, nest = read(MASTER)
+
+    history = set(history)
+
+    # Find all the ignore files in lcl and save them.
+    if args.ignore:
         search = os.path.normpath(BASE_L + "/**/.rignore")
         ignores = glob.glob(search, recursive=True)
-
-        if args.ignore:
-            regexs, plain = rsinc.build_regexs(BASE_L, ignores)
-            print("Ignoring:", plain)
-            exit()
-    else:
-        ignores = []
-
-    # Get & read master/history.
-    if args.purge:
-        print(ylw('WARN:'), 'Purging history of all folders')
-        write(MASTER, empty())
-        write(HISTORY, set())
-
-    if not os.path.exists(MASTER):
-        print(ylw('WARN:'), MASTER, 'missing, this must be your first run')
-        write(MASTER, empty())
-
-    if not os.path.exists(HISTORY):
-        print(ylw('WARN:'), HISTORY, 'missing')
-        write(HISTORY, set())
-
-    master = read(MASTER)
-    history = set(read(HISTORY))
+        write(MASTER, (history, ignores, nest))
+        regexs, plain = rsinc.build_regexs(BASE_L, ignores)
+        print("Ignoring:", plain)
 
     # Detect crashes.
     if os.path.exists(TEMP_FILE):
@@ -303,7 +290,7 @@ def main():
             print('Running', ylw('recover/first_sync'), 'mode')
         else:
             print('Reading last state.')
-            branch = get_branch(master, folder)
+            branch = get_branch(nest, folder)
             unpack(branch, old)
 
             rsinc.calc_states(old, lcl)
@@ -323,22 +310,22 @@ def main():
                 rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
                            total=total, case=CASE_INSENSATIVE)
 
-                # Merge into master and clean up.
                 spin.start(grn('Saving: ') + qt(folder))
-
-                merge(master, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
-                write(MASTER, master)
-
-                subprocess.run(["rm", TEMP_FILE])
-                spin.stop_and_persist(symbol='✔')
 
                 # Merge into history.
                 command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
                 result = subprocess.Popen(command, stdout=subprocess.PIPE)
                 dirs = json.load(result.stdout)
+
                 history.add(folder)
                 history.update(folder + '/' + d['Path'] for d in dirs)
-                write(HISTORY, history)
+
+                # Merge into nest and clean up.
+                merge(nest, folder, pack(rsinc.lsl(BASE_L + folder, HASH_NAME)))
+                write(MASTER, (history, ignores, nest))
+                subprocess.run(["rm", TEMP_FILE])
+
+                spin.stop_and_persist(symbol='✔')
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(folder))
