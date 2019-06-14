@@ -12,7 +12,7 @@ Near:
 - [x] Separate moving and basic syncing into two functions.
 - [x] Add move/rename detection for printing
 - [x] Build ignore system
-- [ ] Update readme with .rignore system
+- [x] Update readme with .rignore system
 - [ ] Document edge cases
 
 
