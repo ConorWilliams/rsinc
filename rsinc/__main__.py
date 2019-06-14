@@ -311,28 +311,27 @@ def main():
 
                 spin.start(grn('Saving: ') + qt(folder))
 
+                # Get post sync state
+                now = rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)
+
                 # Merge into history.
-                command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
-                result = subprocess.Popen(command, stdout=subprocess.PIPE)
-                dirs = json.load(result.stdout)
-
+                dirs = set(os.path.split(n)[0] for n in now.names.keys())
+                history.update(os.path.join(folder, d) for d in dirs)
                 history.add(folder)
-                history.update(folder + '/' + d['Path'] for d in dirs)
 
-                # Merge into nest and clean up.
-                merge(nest, folder, pack(
-                    rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)))
+                # Merge into nest
+                merge(nest, folder, pack(now))
                 write(MASTER, (history, ignores, nest))
+
+                # Clean up.
                 subprocess.run(["rm", TEMP_FILE])
 
                 spin.stop_and_persist(symbol='✔')
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(folder))
-
             subprocess.run(["rclone", 'rmdirs', path_rmt])
             subprocess.run(["rclone", 'rmdirs', path_lcl])
-
             spin.stop_and_persist(symbol='✔')
 
         recover = args.recovery
