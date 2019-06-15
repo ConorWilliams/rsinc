@@ -306,6 +306,7 @@ def main():
                 print(grn("Live pass:"))
 
                 write(TEMP_FILE, {'folder': folder})
+
                 rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
                            total=total, case=CASE_INSENSATIVE)
 
@@ -315,15 +316,16 @@ def main():
                 now = rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)
 
                 # Merge into history.
-                dirs = set(os.path.split(n)[0] for n in now.names.keys())
-                history.update(os.path.join(folder, d) for d in dirs)
                 history.add(folder)
+                for name in now.names.keys():
+                    d = os.path.split(name)[0]
+                    d = os.path.join(folder, d)
+                    history.add(d)
 
                 # Merge into nest
                 merge(nest, folder, pack(now))
                 write(MASTER, (history, ignores, nest))
 
-                # Clean up.
                 subprocess.run(["rm", TEMP_FILE])
 
                 spin.stop_and_persist(symbol='✔')
