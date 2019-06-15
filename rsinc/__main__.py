@@ -210,12 +210,10 @@ def main():
     recover = args.recovery
 
     # Decide which folder(s) to sync.
-    cwd = os.getcwd()
-
     if args.default:
         tmp = DEFAULT_DIRS
     elif len(args.folders) == 0:
-        tmp = [cwd]
+        tmp = [os.getcwd()]
     else:
         tmp = []
         for f in args.folders:

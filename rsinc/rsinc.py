@@ -128,9 +128,7 @@ def lsl(path, hash_name, regexs=[]):
 
     out = Flat(path)
     for d in list_of_dicts:
-        if any(r.match(d['Path']) for r in regexs):
-            continue
-        else:
+        if not any(r.match(d['Path']) for r in regexs):
             time = d['ModTime'][:19]
             time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
@@ -268,13 +266,14 @@ def match_moves(old, lcl, rmt):
                 rmt.names[name].synced = True
                 continue
             elif rmt.names[name].moved:
-                # Conflict, two moves to same place in lcl and remote.
+                # Conflict, two moves to same place in lcl and remote. Could
+                # trace their compliments and do something with them here.?
                 rmt.names[name].synced = True
                 file.state = UPDATED
                 rmt.names[name].state = UPDATED
                 continue
-            elif name in old.names and lcl.uids[old.names[name].uid].moved:
-                # This deals with the degenerate, double-move edge case.
+            elif name in old.names and (old.names[name].uid in lcl.uids) and lcl.uids[old.names[name].uid].moved:
+                # This deals is the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 tmv_rmt = rmt.names[name]
 
@@ -513,7 +512,7 @@ def null(*args):
     return
 
 
-# Encodes logic for match names function.
+# Encodes logic for match states function.
 LOGIC = [[null, pull, delL, conflict],
          [push, conflict, push, conflict],
          [delR, pull, null, pull],
