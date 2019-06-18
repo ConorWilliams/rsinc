@@ -91,6 +91,9 @@ track = Struct()  # global used to track how many operations sync needs.
 # *                                 Functions                                *
 # ****************************************************************************
 
+ESCAPE = {'\\': '\\\\', '.': '\\.', '^': '\\^',
+          '$': '\\$', '*': '\\*', '+': '\\+', '|': '\\|', }
+
 
 def build_regexs(path, files):
     '''
@@ -103,7 +106,10 @@ def build_regexs(path, files):
 
     for file in files:
         if os.path.exists(file):
-            base = os.path.split(file)[0][len(path):]
+            base = []
+            for char in os.path.split(file)[0][len(path):]:
+                base.append(ESCAPE.get(char, char))
+            base = ''.join(base)
 
             with open(file, 'r') as fp:
                 for line in fp:
