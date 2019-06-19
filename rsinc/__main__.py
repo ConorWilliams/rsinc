@@ -298,7 +298,7 @@ def main():
                                      case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
-        print('With', len(new_dirs), 'make directories')
+        print('With:', len(new_dirs), 'directories to make')
 
         if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
             if total != 0 or recover:

@@ -221,6 +221,7 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 
         cp_lcl.clean()
         cp_rmt.clean()
+        track.pool.wait()
 
         match_states(cp_lcl, cp_rmt, recover=False)
         match_states(cp_rmt, cp_lcl, recover=False)
@@ -236,11 +237,11 @@ def make_dirs(dirs):
     global track
 
     total = len(dirs)
-    for c, d in enumerate(sorted(dirs, key=len, reverse=True)):
+    for c, d in enumerate(sorted(dirs, key=len), 1):
         print('%d/%d' % (c, total), 'Making dir:', d)
         log.info('%s%s', 'MAKING:'.ljust(10), d)
 
-        track.pool.run(['rclone', 'mkdir', d], tmp_workers=20)
+        subprocess.run(['rclone', 'mkdir', d])
 
     track.pool.wait()
 
@@ -380,29 +381,6 @@ def trace_rmt(file, old, rmt):
         return NOTHERE, None
 
 
-def balance(name_lcl, name_rmt, lcl, rmt):
-    '''
-    Used to match names when a case-conflict-rename generates name
-    differences between local and remote.
-    '''
-    nn_lcl = name_lcl
-    nn_rmt = name_rmt
-
-    while nn_lcl != nn_rmt:
-        if len(nn_lcl.split('/')[-1]) > len(nn_rmt.split('/')[-1]):
-            nn_rmt = nn_lcl
-        else:
-            nn_lcl = nn_rmt
-
-        resolve_case(nn_lcl, lcl)
-        resolve_case(nn_rmt, rmt)
-
-    if nn_lcl != name_lcl:
-        safe_move(name_lcl, nn_lcl, lcl)
-    if nn_rmt != name_rmt:
-        safe_move(name_rmt, nn_rmt, rmt)
-
-
 def resolve_case(name, flat):
     '''
     Detects if 'name_s' has any case conflicts in any of the Flat()'s in
@@ -423,27 +401,54 @@ def resolve_case(name, flat):
     return new_name
 
 
-def safe_push(name_s, name_d, flat_s, flat_d):
+def safe_push(name, flat_s, flat_d):
     '''
     Push name_s to name_d making sure name_d, avoids name/case conflicts and
     balances names if they change. Adds the new file into flat_d.
     '''
+    global track
 
-    # ************* NEEDS REBUILD for threading ***********
-    # Also need to check nn not in source
+    old = name_d
+    new = ''
 
-    nn = resolve_case(name_s, flat_d)
-    push(name_s, nn, flat_s, flat_d)
+    pair = [flat_s, flat_d]
+    c = 1
+
+    while new != old:
+        new, old = resolve_case(new, pair[c]), new
+        c = 0 if c == 1 else 1
+
+    push(name_s, new, flat_s, flat_d)
 
     cpd_dump = flat_s.names[name_s].dump()
     flat_d.update(nn, *cpd_dump)
 
-    balance(name_s, nn, flat_s, flat_d)
+    if new != name:
+        # Must wait for copy to finish before renaming source
+        track.pool.wait()
+        move(name_d, new, flat_mirror)
 
-    # ********************************************************
+
+def safe_move(name_s, name_d, flat_in, flat_mirror)
+    old = name_d
+    new = ''
+
+    pair = [flat_in, flat_mirror]
+    c = 0
+
+    while new != old:
+        new, old = resolve_case(new, pair[c]), new
+        c = 0 if c == 1 else 1
+
+    if new != name_d:
+        move(name_d, new, flat_mirror)
+
+    move(name_s, new, flat_in)
+
+    return new
 
 
-def safe_move(name_s, name_d, flat):
+def move(name_s, name_d, flat):
     '''
     Move name_s to name_d, avoids case/name conflicts and renames if necessary.
     'Flat' is updated to contain new name and remove old name. Returns new name.
@@ -451,7 +456,6 @@ def safe_move(name_s, name_d, flat):
     global track
     track.count += 1
 
-    nn_d = resolve_case(name_d, flat)
     base = flat.path
 
     if base == track.lcl:
@@ -464,21 +468,19 @@ def safe_move(name_s, name_d, flat):
     else:
         text = "Move:"
 
-    info = col(text) + ' (%s) ' % base + name_s + col(' to: ') + nn_d
+    info = col(text) + ' (%s) ' % base + name_s + col(' to: ') + name_d
     text = text.ljust(10)
 
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
-        log.info('%s(%s) %s TO %s', text.upper(), base, name_s, nn_d)
-        subprocess.run(['rclone', 'moveto', base + name_s, base + nn_d])
+        log.info('%s(%s) %s TO %s', text.upper(), base, name_s, name_d)
+        track.pool.run(['rclone', 'moveto', base + name_s, base + name_d])
     else:
         print(info)
 
     mvd_dump = flat.names[name_s].dump()
     flat.rm(name_s)
-    flat.update(nn_d, *mvd_dump)
-
-    return nn_d
+    flat.update(name_d, *mvd_dump)
 
 
 def push(name_s, name_d, flat_s, flat_d):
