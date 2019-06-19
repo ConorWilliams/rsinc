@@ -13,7 +13,7 @@ from clint.textui import colored
 
 from .pool import SubPool
 
-NUMBER_OF_WORKERS = 4
+NUMBER_OF_WORKERS = 3
 
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
@@ -408,6 +408,10 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     Push name_s to name_d making sure name_d, avoids name/case conflicts and
     balances names if they change. Adds the new file into flat_d.
     '''
+
+    # ************* NEEDS REBUILD for threading ***********
+    # Also need to check nn not in source
+
     nn = resolve_case(name_s, flat_d)
     push(name_s, nn, flat_s, flat_d)
 
@@ -415,6 +419,8 @@ def safe_push(name_s, name_d, flat_s, flat_d):
     flat_d.update(nn, *cpd_dump)
 
     balance(name_s, nn, flat_s, flat_d)
+
+    # ********************************************************
 
 
 def safe_move(name_s, name_d, flat):
