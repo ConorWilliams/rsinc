@@ -4,14 +4,25 @@ import itertools
 
 
 class SubPool():
+    """
+    @brief      Class to coordinate a pool of worker subprocess Processes
+    """
+
     def __init__(self, max_workers):
         self.procs = []
         self.max_workers = max_workers
 
     def run(self, cmd):
+        """
+        @brief      Launch a subprocess to run a command.
+
+        @param      self  The object
+        @param      cmd   The command to run 
+
+        @return     None.
+        """
         if len(self.procs) < self.max_workers:
             self.procs.append(subprocess.Popen(cmd))
-            #print('appended', self.procs[-1].args)
             return
         else:
             done = None
@@ -22,12 +33,18 @@ class SubPool():
             self.run(cmd)
 
     def _find_done_process(self):
+        """
+        @brief      Finds a completed Process.
+
+        @param      self  The object
+
+        @return     Index of the completed Process.
+        """
         for c, proc in enumerate(self.procs):
             poll = proc.poll()
             if poll == 0:
                 return c
             elif poll == None:
-                #print('sleep', proc.args)
                 sleep(0.1)
                 continue
             else:
@@ -37,8 +54,14 @@ class SubPool():
         return None
 
     def wait(self):
+        """
+        @brief      Waits for all worker Processes to complete.
+
+        @param      self  The object
+
+        @return     None.
+        """
         for proc in self.procs:
-            #print('waiting', proc.args)
             proc.wait()
             proc.terminate()
 
