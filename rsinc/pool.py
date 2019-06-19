@@ -16,12 +16,12 @@ class SubPool():
         else:
             done = None
             while done == None:
-                done = __find_done_process()
+                done = self._find_done_process()
 
             self.procs.pop(done).terminate()
             self.run(cmd)
 
-    def __find_done_process(self):
+    def _find_done_process(self):
         for c, proc in enumerate(self.procs):
             poll = proc.poll()
             if poll == 0:

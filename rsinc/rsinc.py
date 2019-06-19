@@ -10,10 +10,11 @@ import ujson as json
 from copy import deepcopy
 from datetime import datetime
 from clint.textui import colored
+from tqdm import tqdm
 
 from .pool import SubPool
 
-NUMBER_OF_WORKERS = 4
+NUMBER_OF_WORKERS = 7
 
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
@@ -236,11 +237,11 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 def make_dirs(dirs):
     global track
 
-    total = len(dirs)
-    for c, d in enumerate(sorted(dirs, key=len), 1):
-        print('%d/%d' % (c, total), 'Making dir:', d)
-        log.info('%s%s', 'MAKING:'.ljust(10), d)
+    if NUMBER_OF_WORKERS == 1:
+        return
 
+    total = len(dirs)
+    for d in tqdm(sorted(dirs, key=len), desc="mkdirs"):
         subprocess.run(['rclone', 'mkdir', d])
 
     track.pool.wait()
@@ -424,8 +425,6 @@ def safe_push(name, flat_s, flat_d):
         track.pool.wait()
         move(name, new, flat_s)
 
-    return new
-
 
 def safe_move(name_s, name_d, flat_in, flat_mirror):
     old = ''
@@ -442,8 +441,6 @@ def safe_move(name_s, name_d, flat_in, flat_mirror):
         move(name_d, new, flat_mirror)
 
     move(name_s, new, flat_in)
-
-    return new
 
 
 def move(name_s, name_d, flat):
