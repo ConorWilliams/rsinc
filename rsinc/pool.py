@@ -1,41 +1,35 @@
-from multiprocessing import Process, Queue
 from time import sleep
 import subprocess
+import itertools
 
 
 class SubPool():
     def __init__(self, max_workers):
-        self.queue = Queue()
-        self.workers = []
+        self.procs = []
+        self.max_workers = 4
 
-        for _ in range(max_workers):
-            self.workers.append(Process(target=thread, args=(self.queue, )))
+    def run(self, cmd):
 
-        for t in self.workers:
-            t.start()
+        if len(self.procs) < self.max_workers:
+            self.procs.append(subprocess.Popen(cmd))
+            #print('appended', self.procs[-1].args)
+            return
+        else:
+            for c, proc in itertools.cycle(enumerate(self.procs)):
+                poll = proc.poll()
+                if poll == 0:
+                    break
+                elif poll == None:
+                    #print('sleep', proc.args)
+                    sleep(0.1)
+                    continue
+                else:
+                    print('Error polled:', poll, proc.args)
 
-    def run(self, command):
-
-        while not self.queue.empty():
-            sleep(0.1)
-
-        self.queue.put(command)
-
-        return
+            self.procs.pop(c).terminate()
+            self.run(cmd)
 
     def join(self):
-        for _ in range(len(self.workers)):
-            self.queue.put(None)
-
-        for t in self.workers:
-            t.join()
-
-
-def thread(queue):
-    while True:
-        cmd = queue.get()
-
-        if cmd == None:
-            return 0
-        else:
-            subprocess.run(cmd)
+        for c, proc in enumerate(self.procs):
+            print('waiting', proc.args)
+            proc.wait()
