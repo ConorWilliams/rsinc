@@ -7,5 +7,5 @@ from .rsinc import make_dirs
 from .rsinc import Flat
 
 
-__version__ = "2.3-DEV"
+__version__ = "2.4-DEV"
 __author__ = "ConorWilliams"
