@@ -6,7 +6,8 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 * Robust two-way syncing 
 * Tracks file moves and performs compound move/updates
-* **Selective** syncing for improved speed and fine control
+* **Selective** syncing for improved speed
+* Multiprocess uploads/downloads/moves/deletes in parallel
 * Recovery mode
 * Dry-run mode 
 * Crash detection and recovery
@@ -110,11 +111,11 @@ Rsinc stores an image of the last state in a tree structured dictionary called `
 
 Running rsinc with the `-i` flag will trigger a recursive search through `BASE_L` finding (and saving) any `.rignore` files. Within an `.rignore` file you can specify regular expressions to ignore files within the `.rignores`'s directory (and all sub directories). For example for `~/path/.rignore`:
 
-* `.*.txt` - recursively ignore all text file in `~/path/`.
-* `.git/` - ignore all files in `~/path/.git/`.
-* `.*.git/` - recursively ignore all files in `~/path/` inside any `.git/` folder.
-* `[^/]*.txt` - ignore any text file in `~/path/` but not in sub directories.
-* `(?!.*.py$)` - recursively ignore everything in `~/path/` unless it ends with `.py` i.e. is a python source file.
+* `.*\.txt` - recursively ignore all text file in `~/path/`.
+* `\.git/` - ignore all files in `~/path/.git/`.
+* `.*\.git/` - recursively ignore all files in `~/path/` inside any `.git/` folder.
+* `[^/]*\.txt` - ignore any text file in `~/path/` but not in sub directories.
+* `(?!.*\.py$)` - recursively ignore everything in `~/path/` unless it ends with `.py` i.e. is a python source file.
 
 If any of the regular expressions match a files path it will be ignored. If you make a new `.rignore` file (but not if you update one) you will need to run rsinc with the `-i` flag to fetch new ignore files. It is more efficient to selectively sync the folders you want syncing than to run rsinc on a higher level directory with many ignores.
 

@@ -210,12 +210,10 @@ def main():
     recover = args.recovery
 
     # Decide which folder(s) to sync.
-    cwd = os.getcwd()
-
     if args.default:
         tmp = DEFAULT_DIRS
     elif len(args.folders) == 0:
-        tmp = [cwd]
+        tmp = [os.getcwd()]
     else:
         tmp = []
         for f in args.folders:
@@ -296,43 +294,43 @@ def main():
             rsinc.calc_states(old, rmt)
 
         print(grn('Dry pass:'))
-        total = rsinc.sync(lcl, rmt, old, recover,
-                           dry_run=True, case=CASE_INSENSATIVE)
+        total, new_dirs = rsinc.sync(lcl, rmt, old, recover, dry_run=True,
+                                     case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
+        print('With:', len(new_dirs), 'folder(s) to make')
 
         if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
             if total != 0 or recover:
                 print(grn("Live pass:"))
 
                 write(TEMP_FILE, {'folder': folder})
-                rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
-                           total=total, case=CASE_INSENSATIVE)
+
+                rsinc.make_dirs(new_dirs)
+                rsinc.sync(lcl, rmt, old, recover, total=total,
+                           case=CASE_INSENSATIVE, dry_run=dry_run)
 
                 spin.start(grn('Saving: ') + qt(folder))
 
+                # Get post sync state
+                now = rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)
+
                 # Merge into history.
-                command = ['rclone', 'lsjson', '-R', '--dirs-only', path_lcl]
-                result = subprocess.Popen(command, stdout=subprocess.PIPE)
-                dirs = json.load(result.stdout)
-
                 history.add(folder)
-                history.update(folder + '/' + d['Path'] for d in dirs)
+                history.update(d for d in now.dirs)
 
-                # Merge into nest and clean up.
-                merge(nest, folder, pack(
-                    rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)))
+                # Merge into nest
+                merge(nest, folder, pack(now))
                 write(MASTER, (history, ignores, nest))
+
                 subprocess.run(["rm", TEMP_FILE])
 
                 spin.stop_and_persist(symbol='✔')
 
         if args.clean:
             spin.start(grn('Pruning: ') + qt(folder))
-
             subprocess.run(["rclone", 'rmdirs', path_rmt])
             subprocess.run(["rclone", 'rmdirs', path_lcl])
-
             spin.stop_and_persist(symbol='✔')
 
         recover = args.recovery
