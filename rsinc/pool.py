@@ -6,7 +6,7 @@ import itertools
 class SubPool():
     def __init__(self, max_workers):
         self.procs = []
-        self.max_workers = 4
+        self.max_workers = 20
 
     def run(self, cmd):
 
@@ -24,9 +24,10 @@ class SubPool():
                     sleep(0.1)
                     continue
                 else:
-                    print('Error polled:', poll, proc.args)
+                    print('Error polled:', poll, 'with', proc.args)
+                    break
 
-            self.procs.pop(c).terminate()
+            self.procs.pop(c).kill()
             self.run(cmd)
 
     def join(self):

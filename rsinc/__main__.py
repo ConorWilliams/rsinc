@@ -315,10 +315,7 @@ def main():
 
                 # Merge into history.
                 history.add(folder)
-                for name in now.names.keys():
-                    d = os.path.split(name)[0]
-                    d = os.path.join(folder, d)
-                    history.add(d)
+                history.update(d for d in now.dirs)
 
                 # Merge into nest
                 merge(nest, folder, pack(now))

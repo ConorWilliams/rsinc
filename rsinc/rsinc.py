@@ -52,6 +52,7 @@ class Flat():
         self.names = {}
         self.uids = {}
         self.lower = set()
+        self.dirs = set()
 
     def update(self, name, uid, time=0, state=THESAME, moved=False,
                is_clone=False, synced=False):
@@ -59,6 +60,10 @@ class Flat():
         self.names.update(
             {name: File(name, uid, time, state, moved, is_clone, synced)})
         self.lower.add(name.lower())
+
+        d = os.path.split(name)[0]
+        d = os.path.join(self.path, d)
+        self.dirs.add(d)
 
         if uid in self.uids:
             self.names[name].is_clone = True
@@ -221,6 +226,9 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
         match_states(cp_rmt, cp_lcl, recover=False)
 
     track.pool.join()
+
+    for d in (cp_lcl.dirs ^ lcl.dirs):
+        subprocess.run(['rclone', 'mkdir', d])
 
     return track.count
 
