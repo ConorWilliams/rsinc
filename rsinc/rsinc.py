@@ -13,7 +13,7 @@ from clint.textui import colored
 
 from .pool import SubPool
 
-NUMBER_OF_WORKERS = 1
+NUMBER_OF_WORKERS = 4
 
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
@@ -197,14 +197,14 @@ def calc_states(old, new):
             file.state = CREATED
 
 
-def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True, pre_run=True):
+def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     ''' Main sync function runs appropriate sync depending on arguments.'''
     global track
 
     track.lcl = lcl.path
     track.rmt = rmt.path
     track.total = total
-    track.dry = dry_run or pre_run
+    track.dry = dry_run
     track.case = case
     track.count = 0
     track.pool = SubPool(NUMBER_OF_WORKERS)
@@ -225,13 +225,24 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True, pr
         match_states(cp_lcl, cp_rmt, recover=False)
         match_states(cp_rmt, cp_lcl, recover=False)
 
-    track.pool.join()
+    track.pool.wait()
 
-    if not dry_run and pre_run:
-        for d in (cp_lcl.dirs ^ lcl.dirs):
-            subprocess.run(['rclone', 'mkdir', d])
+    dirs = (cp_lcl.dirs - lcl.dirs) | (cp_rmt.dirs - rmt.dirs)
 
-    return track.count
+    return track.count, dirs
+
+
+def make_dirs(dirs):
+    global track
+
+    total = len(dirs)
+    for c, d in enumerate(sorted(dirs, key=len, reverse=True)):
+        print('%d/%d' % (c, total), 'Making dir:', d)
+        log.info('%s%s', 'MAKING:'.ljust(10), d)
+
+        track.pool.run(['rclone', 'mkdir', d], tmp_workers=20)
+
+    track.pool.wait()
 
 
 def match_states(lcl, rmt, recover):

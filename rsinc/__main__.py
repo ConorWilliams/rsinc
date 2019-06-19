@@ -294,10 +294,11 @@ def main():
             rsinc.calc_states(old, rmt)
 
         print(grn('Dry pass:'))
-        total = rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
-                           pre_run=True, case=CASE_INSENSATIVE)
+        total, new_dirs = rsinc.sync(lcl, rmt, old, recover, dry_run=True,
+                                     case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
+        print('With', len(new_dirs), 'make directories')
 
         if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
             if total != 0 or recover:
@@ -305,8 +306,9 @@ def main():
 
                 write(TEMP_FILE, {'folder': folder})
 
-                rsinc.sync(lcl, rmt, old, recover, pre_run=False,
-                           total=total, case=CASE_INSENSATIVE, dry_run=dry_run)
+                rsinc.make_dirs(new_dirs)
+                rsinc.sync(lcl, rmt, old, recover, total=total,
+                           case=CASE_INSENSATIVE, dry_run=dry_run)
 
                 spin.start(grn('Saving: ') + qt(folder))
 
