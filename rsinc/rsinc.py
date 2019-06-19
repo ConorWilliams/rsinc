@@ -271,7 +271,7 @@ def match_states(lcl, rmt, recover):
                 else:
                     pull(name, name, lcl, rmt)
         elif file.state != DELETED:
-            safe_push(name, name, lcl, rmt)
+            safe_push(name, lcl, rmt)
         else:
             print(red("WARN:"), 'unpaired deleted:', lcl.path, name)
 
@@ -293,35 +293,32 @@ def match_moves(old, lcl, rmt):
         file.synced = True
 
         if name in rmt.names:
+            rmt.names[name].synced = True
+
             if rmt.names[name].state == DELETED:
                 # Can move like normal but will trigger rename and may trigger
                 # unpaired delete warn.
                 pass
             elif file.uid == rmt.names[name].uid:
                 # Uids match therefore both moved to same place in lcl and rmt.
-                rmt.names[name].synced = True
                 continue
             elif rmt.names[name].moved:
                 # Conflict, two moves to same place in lcl and remote. Could
                 # trace their compliments and do something with them here.?
-                rmt.names[name].synced = True
                 file.state = UPDATED
                 rmt.names[name].state = UPDATED
                 continue
             elif name in old.names and (old.names[name].uid in lcl.uids) and lcl.uids[old.names[name].uid].moved:
                 # This deals is the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
-                tmv_rmt = rmt.names[name]
-
-                tmv_rmt.synced = True
                 mvd_lcl.synced = True
 
-                nn = safe_move(name, mvd_lcl.name, rmt)
-                balance(mvd_lcl.name, nn, lcl, rmt)
+                safe_move(name, mvd_lcl.name, rmt, lcl)
             else:
                 # Not deleted, not supposed to be moved, not been moved.
                 # Therefore rename rmt and procced with matching files move.
-                safe_move(name, name, rmt)
+                nn = resolve_case(name, rmt)
+                move(name, nn, rmt)
 
         trace, f_rmt = trace_rmt(file, old, rmt)
 
@@ -329,20 +326,19 @@ def match_moves(old, lcl, rmt):
             f_rmt.synced = True
 
             if f_rmt.state == DELETED:
-                # Delete shy.
-                safe_push(name, name, lcl, rmt)
+                # Delete shy. Will trigger unpaired delete warn in match states.
+                safe_push(name, lcl, rmt)
             else:
                 # Move complimentary in rmt.
-                nn = safe_move(f_rmt.name, name, rmt)
-                balance(name, nn, lcl, rmt)
+                safe_move(f_rmt.name, name, rmt, lcl)
 
         elif trace == MOVED:
+            # Give preference to remote moves.
             f_rmt.synced = True
-            nn = safe_move(name, f_rmt.name, lcl)
-            balance(nn, f_rmt.name, lcl, rmt)
+            safe_move(name, f_rmt.name, lcl, rmt)
 
         elif trace == CLONE or trace == NOTHERE:
-            safe_push(name, name, lcl, rmt)
+            safe_push(name, lcl, rmt)
 
 
 def trace_rmt(file, old, rmt):
@@ -424,9 +420,11 @@ def safe_push(name, flat_s, flat_d):
     flat_d.update(nn, *cpd_dump)
 
     if new != name:
-        # Must wait for copy to finish before renaming source
+        # Must wait for copy to finish before renaming source.
         track.pool.wait()
         move(name_d, new, flat_mirror)
+
+    return new
 
 
 def safe_move(name_s, name_d, flat_in, flat_mirror)
@@ -524,11 +522,18 @@ def conflict(name_s, name_d, flat_s, flat_d):
     if not track.dry:
         log.info('CONFLICT: %s', name_s)
 
-    nn_lcl = safe_move(name_s, prepend(name_s, 'lcl_'), flat_s)
-    nn_rmt = safe_move(name_d, prepend(name_d, 'rmt_'), flat_d)
+    nn_s = resolve_case(prepend(name_s, 'lcl_'), flat_s)
+    nn_d = resolve_case(prepend(name_d, 'rmt_'), flat_d)
 
-    safe_push(nn_lcl, nn_lcl, flat_s, flat_d)
-    safe_push(nn_rmt, nn_rmt, flat_d, flat_s)
+    move(name_s, nn_s, flat_s)
+    move(name_d, nn_d, flat_d)
+
+    if nn_s != name_s or nn_d != name_d:
+        # Must wait for renames before copying.
+        track.pool.wait()
+
+    safe_push(nn_s, flat_s, flat_d)
+    safe_push(nn_d, flat_d, flat_s)
 
 
 def delL(name_s, name_d, flat_s, flat_d):
