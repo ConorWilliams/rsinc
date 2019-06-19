@@ -17,7 +17,6 @@ class SubPool():
     def run(self, command):
 
         while not self.queue.empty():
-            print('sleepy')
             sleep(0.1)
 
         self.queue.put(command)

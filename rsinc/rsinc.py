@@ -5,15 +5,15 @@ import os
 import subprocess
 import logging
 import re
+import ujson as json
+
 from copy import deepcopy
 from datetime import datetime
-
-import ujson as json
 from clint.textui import colored
 
 from .pool import SubPool
 
-NUMBER_OF_WORKERS = 3
+NUMBER_OF_WORKERS = 1
 
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
