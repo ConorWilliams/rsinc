@@ -11,6 +11,10 @@ from datetime import datetime
 import ujson as json
 from clint.textui import colored
 
+from .pool import SubPool
+
+NUMBER_OF_WORKERS = 4
+
 cyn = colored.cyan     # in / to lcl
 mgt = colored.magenta  # in / to rmt
 ylw = colored.yellow   # delete
@@ -20,6 +24,7 @@ THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
 NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4))
 
 log = logging.getLogger(__name__)
+
 
 # ****************************************************************************
 # *                                  Classes                                 *
@@ -82,6 +87,7 @@ class Struct():
         self.rmt = None
         self.dry = True
         self.case = True
+        self.pool = None
 
 
 track = Struct()  # global used to track how many operations sync needs.
@@ -97,7 +103,7 @@ ESCAPE = {'\\': '\\\\', '.': '\\.', '^': '\\^',
 
 def build_regexs(path, files):
     '''
-    Builds a list of relative regular expressions used in lsl to exclude files 
+    Builds a list of relative regular expressions used in lsl to exclude files
     from syncing takes as arguments: 'path' that will be  lsl'd and 'files' list
     of path to .rignore files.
     '''
@@ -123,7 +129,7 @@ def build_regexs(path, files):
 def lsl(path, hash_name, regexs=[]):
     '''
     Runs rclone lsjson on path and returns a Flat containing each file with the
-    uid and last modified time. Checks each file name/path against a list of 
+    uid and last modified time. Checks each file name/path against a list of
     regular expressions causing it to be ignored if matching.
     '''
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
@@ -196,6 +202,7 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.dry = dry_run
     track.case = case
     track.count = 0
+    track.pool = SubPool(NUMBER_OF_WORKERS)
 
     cp_lcl = deepcopy(lcl)
     cp_rmt = deepcopy(rmt)
@@ -213,12 +220,14 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
         match_states(cp_lcl, cp_rmt, recover=False)
         match_states(cp_rmt, cp_lcl, recover=False)
 
+    track.pool.join()
+
     return track.count
 
 
 def match_states(lcl, rmt, recover):
     '''
-    Basic sync given all moves performed. Uses LOGIC array do determine 
+    Basic sync given all moves performed. Uses LOGIC array do determine
     actions, see bottom of file. If recover keeps newest file.
     '''
     names = tuple(sorted(lcl.names.keys()))
@@ -317,7 +326,7 @@ def match_moves(old, lcl, rmt):
 
 def trace_rmt(file, old, rmt):
     '''
-    Finds state of 'file' (a file moved in lcl) in rmt. Returns NOMOVE, MOVED, 
+    Finds state of 'file' (a file moved in lcl) in rmt. Returns NOMOVE, MOVED,
     CLONE or NOTHERE and the file in rmt related to 'file' in lcl.
     '''
     old_file = old.uids[file.uid]
@@ -353,7 +362,7 @@ def trace_rmt(file, old, rmt):
 
 def balance(name_lcl, name_rmt, lcl, rmt):
     '''
-    Used to match names when a case-conflict-rename generates name 
+    Used to match names when a case-conflict-rename generates name
     differences between local and remote.
     '''
     nn_lcl = name_lcl
@@ -376,8 +385,8 @@ def balance(name_lcl, name_rmt, lcl, rmt):
 
 def resolve_case(name, flat):
     '''
-    Detects if 'name_s' has any case conflicts in any of the Flat()'s in 
-    'flat_d'. If it does name is modified until no case conflicts occur and the 
+    Detects if 'name_s' has any case conflicts in any of the Flat()'s in
+    'flat_d'. If it does name is modified until no case conflicts occur and the
     new name returned.
     '''
     global track
@@ -396,7 +405,7 @@ def resolve_case(name, flat):
 
 def safe_push(name_s, name_d, flat_s, flat_d):
     '''
-    Push name_s to name_d making sure name_d, avoids name/case conflicts and 
+    Push name_s to name_d making sure name_d, avoids name/case conflicts and
     balances names if they change. Adds the new file into flat_d.
     '''
     nn = resolve_case(name_s, flat_d)
@@ -410,7 +419,7 @@ def safe_push(name_s, name_d, flat_s, flat_d):
 
 def safe_move(name_s, name_d, flat):
     '''
-    Move name_s to name_d, avoids case/name conflicts and renames if necessary. 
+    Move name_s to name_d, avoids case/name conflicts and renames if necessary.
     'Flat' is updated to contain new name and remove old name. Returns new name.
     '''
     global track
@@ -466,7 +475,7 @@ def push(name_s, name_d, flat_s, flat_d):
         print('%d/%d' % (track.count, track.total), info)
         log.info('%s%s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
-        subprocess.run(cmd)
+        track.pool.run(cmd)
     else:
         print(info)
 
@@ -504,7 +513,8 @@ def delL(name_s, name_d, flat_s, flat_d):
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
         log.info('DELETE:   %s', flat_s.path + name_s)
-        subprocess.run(['rclone', 'delete', flat_s.path + name_s])
+        cmd = ['rclone', 'delete', flat_s.path + name_s]
+        track.pool.run(cmd)
     else:
         print(info)
 
