@@ -17,7 +17,7 @@ Near:
 
 
 Mid:
-- [ ] Multi-threading
+- [x] Multi-threading
 - [ ] Test script
 
 
