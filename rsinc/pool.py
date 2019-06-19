@@ -32,5 +32,5 @@ class SubPool():
 
     def join(self):
         for c, proc in enumerate(self.procs):
-            print('waiting', proc.args)
+            #print('waiting', proc.args)
             proc.wait()

@@ -294,8 +294,8 @@ def main():
             rsinc.calc_states(old, rmt)
 
         print(grn('Dry pass:'))
-        total = rsinc.sync(lcl, rmt, old, recover,
-                           dry_run=True, case=CASE_INSENSATIVE)
+        total = rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
+                           pre_run=True, case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
 
@@ -305,8 +305,8 @@ def main():
 
                 write(TEMP_FILE, {'folder': folder})
 
-                rsinc.sync(lcl, rmt, old, recover, dry_run=dry_run,
-                           total=total, case=CASE_INSENSATIVE)
+                rsinc.sync(lcl, rmt, old, recover, pre_run=False,
+                           total=total, case=CASE_INSENSATIVE, dry_run=dry_run)
 
                 spin.start(grn('Saving: ') + qt(folder))
 

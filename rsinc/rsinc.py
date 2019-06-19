@@ -197,14 +197,14 @@ def calc_states(old, new):
             file.state = CREATED
 
 
-def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
+def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True, pre_run=True):
     ''' Main sync function runs appropriate sync depending on arguments.'''
     global track
 
     track.lcl = lcl.path
     track.rmt = rmt.path
     track.total = total
-    track.dry = dry_run
+    track.dry = dry_run or pre_run
     track.case = case
     track.count = 0
     track.pool = SubPool(NUMBER_OF_WORKERS)
@@ -227,8 +227,9 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 
     track.pool.join()
 
-    for d in (cp_lcl.dirs ^ lcl.dirs):
-        subprocess.run(['rclone', 'mkdir', d])
+    if not dry_run and pre_run:
+        for d in (cp_lcl.dirs ^ lcl.dirs):
+            subprocess.run(['rclone', 'mkdir', d])
 
     return track.count
 
