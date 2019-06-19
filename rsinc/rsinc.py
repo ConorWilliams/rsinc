@@ -12,7 +12,7 @@ from datetime import datetime
 from clint.textui import colored
 from tqdm import tqdm
 
-from .pool import SubPool
+from .SubPool import SubPool
 
 NUMBER_OF_WORKERS = 7
 
