@@ -404,8 +404,8 @@ def safe_push(name, flat_s, flat_d):
     '''
     global track
 
-    old = name_d
-    new = ''
+    old = ''
+    new = name
 
     pair = [flat_s, flat_d]
     c = 1
@@ -414,22 +414,22 @@ def safe_push(name, flat_s, flat_d):
         new, old = resolve_case(new, pair[c]), new
         c = 0 if c == 1 else 1
 
-    push(name_s, new, flat_s, flat_d)
+    push(name, new, flat_s, flat_d)
 
-    cpd_dump = flat_s.names[name_s].dump()
-    flat_d.update(nn, *cpd_dump)
+    cpd_dump = flat_s.names[name].dump()
+    flat_d.update(new, *cpd_dump)
 
     if new != name:
         # Must wait for copy to finish before renaming source.
         track.pool.wait()
-        move(name_d, new, flat_mirror)
+        move(name, new, flat_s)
 
     return new
 
 
-def safe_move(name_s, name_d, flat_in, flat_mirror)
-    old = name_d
-    new = ''
+def safe_move(name_s, name_d, flat_in, flat_mirror):
+    old = ''
+    new = name_d
 
     pair = [flat_in, flat_mirror]
     c = 0
