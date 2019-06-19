@@ -33,6 +33,10 @@ log = logging.getLogger(__name__)
 
 
 class File():
+    """
+    @brief      Class for to represent a file.
+    """
+
     def __init__(self, name, uid, time, state, moved, is_clone, synced):
         self.name = name
         self.uid = uid
@@ -48,6 +52,10 @@ class File():
 
 
 class Flat():
+    """
+    @brief      Class to represent a directory of files.
+    """
+
     def __init__(self, path):
         self.path = path
         self.names = {}
@@ -57,6 +65,20 @@ class Flat():
 
     def update(self, name, uid, time=0, state=THESAME, moved=False,
                is_clone=False, synced=False):
+        """
+        @brief      Add a File to the Flat with specified properties.
+
+        @param      self      The object
+        @param      name      The name of the file
+        @param      uid       The uid of the file
+        @param      time      The modtime of the file
+        @param      state     The state of the file
+        @param      moved     Indicates file is moved
+        @param      is_clone  Indicates file is clone
+        @param      synced    Indicates file is synced
+
+        @return     None.
+        """
 
         self.names.update(
             {name: File(name, uid, time, state, moved, is_clone, synced)})
@@ -74,10 +96,25 @@ class Flat():
             self.uids.update({uid: self.names[name]})
 
     def clean(self):
+        """
+        @brief      Flags all files as unsynced.         
+
+        @param      self  The object
+
+        @return     None.
+        """
         for file in self.names.values():
             file.synced = False
 
     def rm(self, name):
+        """
+        @brief      Removes file from the Flat. 
+
+        @param      self  The object
+        @param      name  The name of the file to delete
+
+        @return     None.
+        """
         if not self.names[name].is_clone:
             del self.uids[self.names[name].uid]
 
@@ -108,11 +145,15 @@ ESCAPE = {'\\': '\\\\', '.': '\\.', '^': '\\^',
 
 
 def build_regexs(path, files):
-    '''
-    Builds a list of relative regular expressions used in lsl to exclude files
-    from syncing takes as arguments: 'path' that will be  lsl'd and 'files' list
-    of path to .rignore files.
-    '''
+    """
+    @brief      Compiles relative regexs.
+
+    @param      path   The path of the current lsl search
+    @param      files  List of absolute paths to .rignore files
+
+    @return     List of compiled relative reqexes and list of plain text
+                relative regexes.
+    """
     regex = []
     plain = []
 
@@ -133,11 +174,17 @@ def build_regexs(path, files):
 
 
 def lsl(path, hash_name, regexs=[]):
-    '''
-    Runs rclone lsjson on path and returns a Flat containing each file with the
-    uid and last modified time. Checks each file name/path against a list of
-    regular expressions causing it to be ignored if matching.
-    '''
+    """
+    @brief      Runs rclone lsjson and builds a Flat.
+
+    @param      path       The path to lsjson
+    @param      hash_name  The hash name to use for the file uid's
+    @param      regexs     List of compiled regexes, a file path/name that
+                           matches any regex will be ignored
+
+    @return     A Flat of files representing the current state of directory at
+                path.
+    """
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
     subprocess.run(['rclone', 'mkdir', path])
@@ -158,10 +205,14 @@ def lsl(path, hash_name, regexs=[]):
 
 
 def prepend(name, prefix):
-    '''
-    Adds 'prefix' to the begging of the file name, 'name' and returns the new
-    name.
-    '''
+    """
+    @brief      Prepends prefix to file name.
+
+    @param      name    The full path to the file
+    @param      prefix  The prefix to prepend to the file name
+
+    @return     Path to file with new name.
+    """
     new_name = name.split('/')
     new_name[-1] = prefix + new_name[-1]
     new_name = '/'.join(new_name)
@@ -169,10 +220,15 @@ def prepend(name, prefix):
 
 
 def calc_states(old, new):
-    '''
-    Calculates if files on one side have been updated, moved, deleted,
-    created or stayed the same. Arguments are both Flats.
-    '''
+    """
+    @brief      Calculates if files on one side have been updated, moved,
+                deleted, created or stayed the same.
+
+    @param      old   Flat of the past state of a directory
+    @param      old   Flat of the past state of a directory
+
+    @return     None.
+    """
     new_before_deletes = tuple(new.names.keys())
 
     for name, file in old.names.items():
@@ -199,7 +255,20 @@ def calc_states(old, new):
 
 
 def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
-    ''' Main sync function runs appropriate sync depending on arguments.'''
+    """
+    @brief      Main sync function runs appropriate sync depending on arguments.
+
+    @param      lcl      Flat of the lcl directory
+    @param      rmt      Flat of the rmt directory
+    @param      old      Flat of the past state of lcl and rmt
+    @param      recover  Flag to run recovery sync
+    @param      dry_run  Flag to do a dry run
+    @param      total    The total number of operations the sync will require
+    @param      case     Flag to enable case insensitive checking
+
+    @return     The total number of jobs required, list of all (absolute)
+                directories not in lcl or remote.
+    """
     global track
 
     track.lcl = lcl.path
@@ -235,6 +304,13 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
 
 
 def make_dirs(dirs):
+    """
+    @brief      Makes new directories
+
+    @param      dirs  List of directories to mkdir
+
+    @return     None.
+    """
     global track
 
     if NUMBER_OF_WORKERS == 1:
@@ -248,10 +324,17 @@ def make_dirs(dirs):
 
 
 def match_states(lcl, rmt, recover):
-    '''
-    Basic sync given all moves performed. Uses LOGIC array do determine
-    actions, see bottom of file. If recover keeps newest file.
-    '''
+    """
+    @brief      Basic sync of files in lcl to remote given all moves performed.
+                Uses LOGIC array to determine actions, see bottom of file. If
+                recover keeps newest file.
+
+    @param      lcl      Flat of the lcl directory
+    @param      rmt      Flat of the rmt directory
+    @param      recover  Flag to use recovery logic
+
+    @return     None.
+    """
     names = tuple(sorted(lcl.names.keys()))
 
     for name in names:
@@ -278,7 +361,15 @@ def match_states(lcl, rmt, recover):
 
 
 def match_moves(old, lcl, rmt):
-    '''Matches any moves in local by making complimentary moves in rmt.'''
+    """
+    @brief      Mirrors file moves in lcl by moving files in rmt.
+
+    @param      old   Flat of the past state of lcl and rmt
+    @param      lcl   Flat of the lcl directory
+    @param      rmt   Flat of the rmt directory
+
+    @return     None.
+    """
     names = tuple(sorted(lcl.names.keys()))
 
     for name in names:
@@ -343,10 +434,16 @@ def match_moves(old, lcl, rmt):
 
 
 def trace_rmt(file, old, rmt):
-    '''
-    Finds state of 'file' (a file moved in lcl) in rmt. Returns NOMOVE, MOVED,
-    CLONE or NOTHERE and the file in rmt related to 'file' in lcl.
-    '''
+    """
+    @brief      Traces the state of file.
+
+    @param      file  The file to trace (in lcl)
+    @param      old   Flat of the past state of lcl and rmt
+    @param      rmt   Flat of the rmt directory
+
+    @return     State (NOMOVE, MOVED, CLONE or NOTHERE) of file in rmt, file
+                object in rmt.
+    """
     old_file = old.uids[file.uid]
 
     if old_file.name in rmt.names:
@@ -379,11 +476,14 @@ def trace_rmt(file, old, rmt):
 
 
 def resolve_case(name, flat):
-    '''
-    Detects if 'name_s' has any case conflicts in any of the Flat()'s in
-    'flat_d'. If it does name is modified until no case conflicts occur and the
-    new name returned.
-    '''
+    """
+    @brief      Prepends name with '_' until no case conflicts in flat.
+
+    @param      name  The name of the file in flat
+    @param      flat  The Flat with the file in
+
+    @return     New name of the file.
+    """
     global track
 
     new_name = name
@@ -399,10 +499,16 @@ def resolve_case(name, flat):
 
 
 def safe_push(name, flat_s, flat_d):
-    '''
-    Push name_s to name_d making sure name_d, avoids name/case conflicts and
-    balances names if they change. Adds the new file into flat_d.
-    '''
+    """
+    @brief      Used to push file when file not in destination, performs case
+                checking / correcting and updates Flats as appropriate.
+
+    @param      name    The name of the file to push
+    @param      flat_s  The source Flat
+    @param      flat_d  The destination Flat
+
+    @return     None.
+    """
     global track
 
     old = ''
@@ -427,6 +533,16 @@ def safe_push(name, flat_s, flat_d):
 
 
 def safe_move(name_s, name_d, flat_in, flat_mirror):
+    """
+    @brief      Moves file performing case checking / correcting.
+
+    @param      name_s       The name of the source file
+    @param      name_d       The name of the destination file
+    @param      flat_in      The Flat in which the move occurs
+    @param      flat_mirror  The Flat which the move is mirroring
+
+    @return     None.
+    """
     old = ''
     new = name_d
 
@@ -444,10 +560,15 @@ def safe_move(name_s, name_d, flat_in, flat_mirror):
 
 
 def move(name_s, name_d, flat):
-    '''
-    Move name_s to name_d, avoids case/name conflicts and renames if necessary.
-    'Flat' is updated to contain new name and remove old name. Returns new name.
-    '''
+    """
+    @brief      Moves file in flat. Updates flat as appropriate.
+
+    @param      name_s  The name of the source file
+    @param      name_d  The name of the destination file
+    @param      flat    The Flat in which the move occurs
+
+    @return     None.
+    """
     global track
     track.count += 1
 
@@ -479,7 +600,16 @@ def move(name_s, name_d, flat):
 
 
 def push(name_s, name_d, flat_s, flat_d):
-    '''Copy name_s in flat_s to name_d in flat_d. No name checks'''
+    """
+    @brief      Copies file.
+
+    @param      name_s  The name of the source file
+    @param      name_d  The name of the destination file
+    @param      flat_s  The Flat containing the source file
+    @param      flat_d  The destination Flat
+
+    @return     None.
+    """
     global track
     track.count += 1
 
@@ -504,12 +634,20 @@ def push(name_s, name_d, flat_s, flat_d):
 
 
 def pull(name_s, name_d, flat_s, flat_d):
-    '''Copy name_d in flat_d to name_s in flat_s. No name checks.'''
     push(name_d, name_s, flat_d, flat_s)
 
 
 def conflict(name_s, name_d, flat_s, flat_d):
-    '''Rename and copy conflicts both ways.'''
+    """
+    @brief      Resolves conflicts by renaming files and copying both ways.
+
+    @param      name_s  The name of the conflicting file in flat_s
+    @param      name_d  The name of the conflicting file in flat_d
+    @param      flat_s  The Flat of lcl/rmt files
+    @param      flat_d  The Flat of rmt/lcl files 
+
+    @return     None.
+    """
     global track
 
     print(red('Conflict: ') + '%d:%d: %s' % (flat_s.names[name_s].state,
@@ -534,7 +672,16 @@ def conflict(name_s, name_d, flat_s, flat_d):
 
 
 def delL(name_s, name_d, flat_s, flat_d):
-    '''Delete name_s in flat_s.'''
+    """
+    @brief      Deletes file.
+
+    @param      name_s  The name of the file to delete
+    @param      name_d  Dummy argument
+    @param      flat_s  The Flat in containing the file to delete
+    @param      flat_d  Dummy argument
+
+    @return     { description_of_the_return_value }
+    """
     global track
     track.count += 1
 
@@ -550,7 +697,6 @@ def delL(name_s, name_d, flat_s, flat_d):
 
 
 def delR(name_s, name_d, flat_s, flat_d):
-    '''Delete name_d in flat_d.'''
     delL(name_d, name_s, flat_d, flat_s)
 
 
