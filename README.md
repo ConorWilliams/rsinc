@@ -6,7 +6,8 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 * Robust two-way syncing 
 * Tracks file moves and performs compound move/updates
-* **Selective** syncing for improved speed and fine control
+* **Selective** syncing for improved speed
+* Multiprocess uploads/downloads/moves/deletes in parallel
 * Recovery mode
 * Dry-run mode 
 * Crash detection and recovery

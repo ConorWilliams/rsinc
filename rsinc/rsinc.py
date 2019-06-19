@@ -48,6 +48,13 @@ class File():
         self.synced = synced
 
     def dump(self):
+        """
+        @brief      Get all properties accept name.
+
+        @param      self  The object
+
+        @return     All file properties accept name.
+        """
         return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
 
 
@@ -313,7 +320,7 @@ def make_dirs(dirs):
     """
     global track
 
-    if NUMBER_OF_WORKERS == 1:
+    if NUMBER_OF_WORKERS == 1 or len(dirs) == 0:
         return
 
     total = len(dirs)
