@@ -45,7 +45,7 @@ class SubPool():
             if poll == 0:
                 return c
             elif poll == None:
-                sleep(0.1)
+                sleep(0.01)
                 continue
             else:
                 print('Error polled:', poll, 'with', proc.args)
