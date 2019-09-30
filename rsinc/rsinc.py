@@ -141,6 +141,7 @@ class Struct():
         self.dry = True
         self.case = True
         self.pool = None
+        self.rclone_flags = []
 
 
 track = Struct()  # global used to track how many operations sync needs.
@@ -201,10 +202,14 @@ def lsl(path, hash_name, regexs=[]):
     @return     A Flat of files representing the current state of directory at
                 path.
     """
+    global track
+
     command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
 
     subprocess.run(['rclone', 'mkdir', path])
-    result = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+    result = subprocess.Popen(command + track.rclone_flags,
+                              stdout=subprocess.PIPE)
     list_of_dicts = json.load(result.stdout)
 
     out = Flat(path)
@@ -609,7 +614,8 @@ def move(name_s, name_d, flat):
     if not track.dry:
         print('%d/%d' % (track.count, track.total), info)
         log.info('%s(%s) %s TO %s', text.upper(), base, name_s, name_d)
-        track.pool.run(['rclone', 'moveto', base + name_s, base + name_d])
+        track.pool.run(['rclone', 'moveto', base + name_s, base + name_d] +
+                       track.rclone_flags)
     else:
         print(info)
 
@@ -647,7 +653,7 @@ def push(name_s, name_d, flat_s, flat_d):
         print('%d/%d' % (track.count, track.total), info)
         log.info('%s%s', text.upper(), name_d)
         cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
-        track.pool.run(cmd)
+        track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)
 
@@ -710,7 +716,7 @@ def delL(name_s, name_d, flat_s, flat_d):
         print('%d/%d' % (track.count, track.total), info)
         log.info('DELETE:   %s', flat_s.path + name_s)
         cmd = ['rclone', 'delete', flat_s.path + name_s]
-        track.pool.run(cmd)
+        track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)
 

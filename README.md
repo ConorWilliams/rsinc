@@ -4,12 +4,12 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 ## Features
 
-* Robust two-way syncing 
+* Robust two-way syncing
 * Tracks file moves and performs compound move/updates
 * **Selective** syncing for improved speed
 * Multiprocess uploads/downloads/moves/deletes in parallel
 * Recovery mode
-* Dry-run mode 
+* Dry-run mode
 * Crash detection and recovery
 * Automatic first run detection and resolution
 * Git-like `.rignore` system supporting regular expressions for ignoring files
@@ -23,13 +23,13 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 Install [rclone](https://github.com/ncw/rclone) and [configure](https://rclone.org/docs/) as appropriate for your cloud service.
 
-Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc@stable` 
+Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc@stable`
 
 Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 
 Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like this by default:
 
-```json { 
+```json {
  {
     "BASE_L": "/home/conor/",
     "BASE_R": "onedrive:",
@@ -47,10 +47,10 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 }
 ```
 
-- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. Note `BASE_L` **_should_** include the trailing backslash as above. 
+- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. Note `BASE_L` **_should_** include the trailing backslash as above.
 - `BASE_R` is the name of your rclone remote. Note `BASE_R` **_should_** include the trailing colon (or backslash is you want root to be a sub folder in remote) as above.
-- `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true. 
-- `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags. 
+- `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true.
+- `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags.
 - `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
 - `LOG_FOLDER` is the path where log files will be written to.
 - `MASTER` is the file that will store an image of the local files at the last run, a history of previously synced directories and paths to .rignore files.
@@ -58,7 +58,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir.  
+Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir. If no paths are supplied then the current working directory will be synced.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
@@ -79,6 +79,8 @@ The optional arguments available are:
 *  -p, --purge, deletes the master file resulting in a **total reset** of all tracking.
 *  -i, --ignore, find `.rignore` files and add them to the ignore list. Flag must be set to find new `.rignore` files.
 *  --config, enter path to a config file, defaults to `~/.rsinc/config.json`.
+
+Any remaining arguments/flags will be passed through to all rclone commands rsinc calls. Note a path must be supplied to rsinc when supplying additional flags instead of relying on the implicit current working directory (which can be explicitly called with `.`).
 
 ## Details
 

@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-print('''
-Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
-This is free software with ABSOLUTELY NO WARRANTY''')
-
 import argparse
 import os
 import subprocess
@@ -16,7 +12,8 @@ import ujson as json
 import halo
 from clint.textui import colored
 
-import rsinc
+from .rsinc import sync, lsl, build_regexs, calc_states, make_dirs, Flat, track
+from .__init__ import __version__
 
 # ****************************************************************************
 # *                               Set-up/Parse                               *
@@ -52,16 +49,17 @@ parser.add_argument("-i",
                     action="store_true")
 parser.add_argument("-v",
                     "--version",
-                    help="Show version and exit",
-                    action="store_true")
+                    action='version',
+                    version=f'rsinc version: {__version__}')
 parser.add_argument("--config",
                     help="Path to config file (default ~/.rsinc/config.json)")
+parser.add_argument("args",
+                    nargs=argparse.REMAINDER,
+                    help='Global flags to pass to rclone commands')
 
 args = parser.parse_args()
 
-if args.version:
-    print('')
-    exit('Version: ' + rsinc.__version__)
+track.rclone_flags = args.args
 
 dry_run = args.dry
 auto = args.auto
@@ -232,6 +230,10 @@ def main():
     '''
     Entry point for 'rsinc' as terminal command.
     '''
+    print('''
+    Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
+    This is free software with ABSOLUTELY NO WARRANTY''')
+
     recover = args.recovery
 
     # Decide which folder(s) to sync.
@@ -268,7 +270,7 @@ def main():
         search = os.path.normpath(BASE_L + "/**/.rignore")
         ignores = glob.glob(search, recursive=True)
         write(MASTER, (history, ignores, nest))
-        regexs, plain = rsinc.build_regexs(BASE_L, ignores)
+        regexs, plain = build_regexs(BASE_L, ignores)
         print("Ignoring:", plain)
 
     # Detect crashes.
@@ -297,14 +299,14 @@ def main():
             recover = True
 
         # Build relative regular expressions
-        regexs, plain = rsinc.build_regexs(path_lcl, ignores)
+        regexs, plain = build_regexs(path_lcl, ignores)
 
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
 
-        lcl = rsinc.lsl(path_lcl, HASH_NAME, regexs)
-        rmt = rsinc.lsl(path_rmt, HASH_NAME, regexs)
-        old = rsinc.Flat('old')
+        lcl = lsl(path_lcl, HASH_NAME, regexs)
+        rmt = lsl(path_rmt, HASH_NAME, regexs)
+        old = Flat('old')
 
         spin.stop_and_persist(symbol='✔')
 
@@ -316,16 +318,16 @@ def main():
             branch = get_branch(nest, folder)
             unpack(branch, old)
 
-            rsinc.calc_states(old, lcl)
-            rsinc.calc_states(old, rmt)
+            calc_states(old, lcl)
+            calc_states(old, rmt)
 
         print(grn('Dry pass:'))
-        total, new_dirs = rsinc.sync(lcl,
-                                     rmt,
-                                     old,
-                                     recover,
-                                     dry_run=True,
-                                     case=CASE_INSENSATIVE)
+        total, new_dirs = sync(lcl,
+                               rmt,
+                               old,
+                               recover,
+                               dry_run=True,
+                               case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
         print('With:', len(new_dirs), 'folder(s) to make')
@@ -337,19 +339,19 @@ def main():
 
                 write(TEMP_FILE, {'folder': folder})
 
-                rsinc.make_dirs(new_dirs)
-                rsinc.sync(lcl,
-                           rmt,
-                           old,
-                           recover,
-                           total=total,
-                           case=CASE_INSENSATIVE,
-                           dry_run=dry_run)
+                make_dirs(new_dirs)
+                sync(lcl,
+                     rmt,
+                     old,
+                     recover,
+                     total=total,
+                     case=CASE_INSENSATIVE,
+                     dry_run=dry_run)
 
                 spin.start(grn('Saving: ') + qt(folder))
 
                 # Get post sync state
-                now = rsinc.lsl(BASE_L + folder, HASH_NAME, regexs)
+                now = lsl(BASE_L + folder, HASH_NAME, regexs)
 
                 # Merge into history.
                 history.add(folder)
