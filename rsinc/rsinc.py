@@ -16,16 +16,15 @@ from .SubPool import SubPool
 
 NUMBER_OF_WORKERS = 7
 
-cyn = colored.cyan     # in / to lcl
+cyn = colored.cyan  # in / to lcl
 mgt = colored.magenta  # in / to rmt
-ylw = colored.yellow   # delete
-red = colored.red      # conflict
+ylw = colored.yellow  # delete
+red = colored.red  # conflict
 
 THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
 NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4))
 
 log = logging.getLogger(__name__)
-
 
 # ****************************************************************************
 # *                                  Classes                                 *
@@ -36,7 +35,6 @@ class File():
     """
     @brief      Class for to represent a file.
     """
-
     def __init__(self, name, uid, time, state, moved, is_clone, synced):
         self.name = name
         self.uid = uid
@@ -62,7 +60,6 @@ class Flat():
     """
     @brief      Class to represent a directory of files.
     """
-
     def __init__(self, path):
         self.path = path
         self.names = {}
@@ -70,8 +67,14 @@ class Flat():
         self.lower = set()
         self.dirs = set()
 
-    def update(self, name, uid, time=0, state=THESAME, moved=False,
-               is_clone=False, synced=False):
+    def update(self,
+               name,
+               uid,
+               time=0,
+               state=THESAME,
+               moved=False,
+               is_clone=False,
+               synced=False):
         """
         @brief      Add a File to the Flat with specified properties.
 
@@ -104,7 +107,7 @@ class Flat():
 
     def clean(self):
         """
-        @brief      Flags all files as unsynced.         
+        @brief      Flags all files as unsynced.
 
         @param      self  The object
 
@@ -115,7 +118,7 @@ class Flat():
 
     def rm(self, name):
         """
-        @brief      Removes file from the Flat. 
+        @brief      Removes file from the Flat.
 
         @param      self  The object
         @param      name  The name of the file to delete
@@ -142,13 +145,19 @@ class Struct():
 
 track = Struct()  # global used to track how many operations sync needs.
 
-
 # ****************************************************************************
 # *                                 Functions                                *
 # ****************************************************************************
 
-ESCAPE = {'\\': '\\\\', '.': '\\.', '^': '\\^',
-          '$': '\\$', '*': '\\*', '+': '\\+', '|': '\\|', }
+ESCAPE = {
+    '\\': '\\\\',
+    '.': '\\.',
+    '^': '\\^',
+    '$': '\\$',
+    '*': '\\*',
+    '+': '\\+',
+    '|': '\\|',
+}
 
 
 def build_regexs(path, files):
@@ -239,7 +248,8 @@ def calc_states(old, new):
     new_before_deletes = tuple(new.names.keys())
 
     for name, file in old.names.items():
-        if name not in new.names and (file.uid not in new.uids or file.is_clone):
+        if name not in new.names and (file.uid not in new.uids
+                                      or file.is_clone):
             # Want all clone-moves to leave delete place holders.
             new.update(name, file.uid, file.time, DELETED)
 
@@ -407,7 +417,9 @@ def match_moves(old, lcl, rmt):
                 file.state = UPDATED
                 rmt.names[name].state = UPDATED
                 continue
-            elif name in old.names and (old.names[name].uid in lcl.uids) and lcl.uids[old.names[name].uid].moved:
+            elif name in old.names and (
+                    old.names[name].uid in lcl.uids
+            ) and lcl.uids[old.names[name].uid].moved:
                 # This deals is the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 mvd_lcl.synced = True
@@ -651,15 +663,15 @@ def conflict(name_s, name_d, flat_s, flat_d):
     @param      name_s  The name of the conflicting file in flat_s
     @param      name_d  The name of the conflicting file in flat_d
     @param      flat_s  The Flat of lcl/rmt files
-    @param      flat_d  The Flat of rmt/lcl files 
+    @param      flat_d  The Flat of rmt/lcl files
 
     @return     None.
     """
     global track
 
-    print(red('Conflict: ') + '%d:%d: %s' % (flat_s.names[name_s].state,
-                                             flat_d.names[name_d].state,
-                                             name_s),)
+    print(
+        red('Conflict: ') + '%d:%d: %s' %
+        (flat_s.names[name_s].state, flat_d.names[name_d].state, name_s), )
 
     if not track.dry:
         log.info('CONFLICT: %s', name_s)
@@ -712,7 +724,9 @@ def null(*args):
 
 
 # Encodes logic for match states function.
-LOGIC = [[null, pull, delL, conflict],
-         [push, conflict, push, conflict],
-         [delR, pull, null, pull],
-         [conflict, conflict, push, conflict], ]
+LOGIC = [
+    [null, pull, delL, conflict],
+    [push, conflict, push, conflict],
+    [delR, pull, null, pull],
+    [conflict, conflict, push, conflict],
+]

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-
 '''
-Rsinc setup script for pip to install rsinc as a package. 
+Rsinc setup script for pip to install rsinc as a package.
 Additionally sets up the ~/.rsinc folder and default config file.
 '''
 
@@ -20,7 +19,8 @@ setuptools.setup(
     version=rsinc.__version__,
     author=rsinc.__author__,
     author_email="conorwilliams@outlook.com",
-    description="A tiny, hackable, two-way cloud synchronisation client for Linux",
+    description=
+    "A tiny, hackable, two-way cloud synchronisation client for Linux",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ConorWilliams/rsinc",
@@ -41,17 +41,28 @@ setuptools.setup(
 
 DRIVE_DIR = os.path.expanduser('~/.rsinc/')  # Where config and data files live
 
-defult_config = {'BASE_R': 'onedrive:',
-                 'BASE_L': os.path.expanduser('~/'),
-                 'CASE_INSENSATIVE': True,
-                 'HASH_NAME': 'SHA-1',
-                 'DEFAULT_DIRS': [os.path.expanduser("~/cpp"),
-                                  os.path.expanduser("~/docs"),
-                                  os.path.expanduser("~/cam"),
-                                  os.path.expanduser("~/py"), ],
-                 'LOG_FOLDER': DRIVE_DIR + 'logs/',
-                 'MASTER': DRIVE_DIR + 'master.json',
-                 'TEMP_FILE': DRIVE_DIR + 'rsinc.tmp', }
+defult_config = {
+    'BASE_R':
+    'onedrive:',
+    'BASE_L':
+    os.path.expanduser('~/'),
+    'CASE_INSENSATIVE':
+    True,
+    'HASH_NAME':
+    'SHA-1',
+    'DEFAULT_DIRS': [
+        os.path.expanduser("~/cpp"),
+        os.path.expanduser("~/docs"),
+        os.path.expanduser("~/cam"),
+        os.path.expanduser("~/py"),
+    ],
+    'LOG_FOLDER':
+    DRIVE_DIR + 'logs/',
+    'MASTER':
+    DRIVE_DIR + 'master.json',
+    'TEMP_FILE':
+    DRIVE_DIR + 'rsinc.tmp',
+}
 
 if not os.path.exists(DRIVE_DIR):
     subprocess.run(['mkdir', DRIVE_DIR])

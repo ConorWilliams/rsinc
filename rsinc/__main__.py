@@ -18,31 +18,42 @@ from clint.textui import colored
 
 import rsinc
 
-
 # ****************************************************************************
 # *                               Set-up/Parse                               *
 # ****************************************************************************
-
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("folders", help="Folders to sync", nargs='*')
 parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
-parser.add_argument("-c", "--clean", action="store_true",
+parser.add_argument("-c",
+                    "--clean",
+                    action="store_true",
                     help="Clean directories")
-parser.add_argument("-D", "--default", help="Sync defaults",
+parser.add_argument("-D",
+                    "--default",
+                    help="Sync defaults",
                     action="store_true")
-parser.add_argument("-r", "--recovery", action="store_true",
+parser.add_argument("-r",
+                    "--recovery",
+                    action="store_true",
                     help="Enter recovery mode")
-parser.add_argument("-a", "--auto", help="Don't ask permissions",
+parser.add_argument("-a",
+                    "--auto",
+                    help="Don't ask permissions",
                     action="store_true")
-parser.add_argument("-p", "--purge", help="Reset history for all folders",
+parser.add_argument("-p",
+                    "--purge",
+                    help="Reset history for all folders",
                     action="store_true")
-parser.add_argument("-i", "--ignore",
+parser.add_argument("-i",
+                    "--ignore",
                     help="Find .rignore and add their contents to ignore list",
                     action="store_true")
-parser.add_argument("-v", "--version",
-                    help="Show version and exit", action="store_true")
+parser.add_argument("-v",
+                    "--version",
+                    help="Show version and exit",
+                    action="store_true")
 parser.add_argument("--config",
                     help="Path to config file (default ~/.rsinc/config.json)")
 
@@ -55,12 +66,11 @@ if args.version:
 dry_run = args.dry
 auto = args.auto
 
-ylw = colored.yellow   # warn
-red = colored.red      # error
-grn = colored.green    # info
+ylw = colored.yellow  # warn
+red = colored.red  # error
+grn = colored.green  # info
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
-
 
 # ****************************************************************************
 # *                                 Functions                                *
@@ -85,8 +95,22 @@ def write(file, d):
         json.dump(d, fp, sort_keys=True, indent=2)
 
 
-STB = ('yes', 'ye', 'y', '1', 't', 'true', '', 'go', 'please', 'fire away',
-       'punch it', 'sure', 'ok', 'hell yes', )
+STB = (
+    'yes',
+    'ye',
+    'y',
+    '1',
+    't',
+    'true',
+    '',
+    'go',
+    'please',
+    'fire away',
+    'punch it',
+    'sure',
+    'ok',
+    'hell yes',
+)
 
 
 def strtobool(string):
@@ -174,7 +198,6 @@ def _have(nest, chain):
 # *                              Configuration                               *
 # ****************************************************************************
 
-
 CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
 
 # Read config and assign variables.
@@ -193,15 +216,17 @@ BASE_R = config['BASE_R']
 BASE_L = config['BASE_L']
 
 # Set up logging.
-logging.basicConfig(filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
-                    level=logging.DEBUG,
-                    datefmt='%H:%M:%S',
-                    format='%(asctime)s %(levelname)s: %(message)s',)
-
+logging.basicConfig(
+    filename=LOG_FOLDER + datetime.now().strftime('%Y-%m-%d'),
+    level=logging.DEBUG,
+    datefmt='%H:%M:%S',
+    format='%(asctime)s %(levelname)s: %(message)s',
+)
 
 # ****************************************************************************
 # *                               Main Program                               *
 # ****************************************************************************
+
 
 def main():
     '''
@@ -267,7 +292,8 @@ def main():
         if folder in history:
             print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
         else:
-            print(ylw('Don\'t have:'), qt(folder) + ', entering first_sync mode')
+            print(ylw('Don\'t have:'),
+                  qt(folder) + ', entering first_sync mode')
             recover = True
 
         # Build relative regular expressions
@@ -294,21 +320,31 @@ def main():
             rsinc.calc_states(old, rmt)
 
         print(grn('Dry pass:'))
-        total, new_dirs = rsinc.sync(lcl, rmt, old, recover, dry_run=True,
+        total, new_dirs = rsinc.sync(lcl,
+                                     rmt,
+                                     old,
+                                     recover,
+                                     dry_run=True,
                                      case=CASE_INSENSATIVE)
 
         print('Found:', total, 'job(s)')
         print('With:', len(new_dirs), 'folder(s) to make')
 
-        if not dry_run and (auto or total == 0 or strtobool(input('Execute? '))):
+        if not dry_run and (auto or total == 0
+                            or strtobool(input('Execute? '))):
             if total != 0 or recover:
                 print(grn("Live pass:"))
 
                 write(TEMP_FILE, {'folder': folder})
 
                 rsinc.make_dirs(new_dirs)
-                rsinc.sync(lcl, rmt, old, recover, total=total,
-                           case=CASE_INSENSATIVE, dry_run=dry_run)
+                rsinc.sync(lcl,
+                           rmt,
+                           old,
+                           recover,
+                           total=total,
+                           case=CASE_INSENSATIVE,
+                           dry_run=dry_run)
 
                 spin.start(grn('Saving: ') + qt(folder))
 

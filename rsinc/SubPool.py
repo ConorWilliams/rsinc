@@ -7,7 +7,6 @@ class SubPool():
     """
     @brief      Class to coordinate a pool of worker subprocess Processes
     """
-
     def __init__(self, max_workers):
         self.procs = []
         self.max_workers = max_workers
@@ -17,7 +16,7 @@ class SubPool():
         @brief      Launch a subprocess to run a command.
 
         @param      self  The object
-        @param      cmd   The command to run 
+        @param      cmd   The command to run
 
         @return     None.
         """
