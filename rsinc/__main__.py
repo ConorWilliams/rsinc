@@ -297,7 +297,7 @@ def main():
         path_rmt = BASE_R + folder + '/'
 
         # Determine if first run.
-        if folder in history:
+        if os.path.join(BASE_L, folder) in history:
             print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
         else:
             print(ylw('Don\'t have:'),
@@ -361,7 +361,7 @@ def main():
                 now = lsl(BASE_L + folder, HASH_NAME, regexs)
 
                 # Merge into history.
-                history.add(folder)
+                history.add(os.path.join(BASE_L, folder))
                 history.update(d for d in now.dirs)
 
                 # Merge into nest
