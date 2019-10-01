@@ -175,17 +175,21 @@ def build_regexs(path, files):
     plain = []
 
     for file in files:
-        if os.path.exists(file):
-            base = []
-            for char in os.path.split(file)[0][len(path):]:
-                base.append(ESCAPE.get(char, char))
-            base = ''.join(base)
+        for f_char, p_char in zip(os.path.split(file)[0], path):
+            if f_char != p_char:
+                break
+        else:
+            if os.path.exists(file):
+                base = []
+                for char in os.path.split(file)[0][len(path):]:
+                    base.append(ESCAPE.get(char, char))
+                base = ''.join(base)
 
-            with open(file, 'r') as fp:
-                for line in fp:
-                    r = os.path.join(base, line.rstrip())
-                    plain.append(r)
-                    regex.append(re.compile(r))
+                with open(file, 'r') as fp:
+                    for line in fp:
+                        r = os.path.join(base, line.rstrip())
+                        plain.append(r)
+                        regex.append(re.compile(r))
 
     return regex, plain
 

@@ -300,6 +300,7 @@ def main():
 
         # Build relative regular expressions
         regexs, plain = build_regexs(path_lcl, ignores)
+        print('Ignore:', plain)
 
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
