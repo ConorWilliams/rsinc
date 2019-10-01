@@ -10,6 +10,7 @@ from datetime import datetime
 
 import ujson as json
 import halo
+from pyfiglet import Figlet
 from clint.textui import colored
 
 from .rsinc import sync, lsl, build_regexs, calc_states, make_dirs, Flat, track
@@ -230,9 +231,10 @@ def main():
     '''
     Entry point for 'rsinc' as terminal command.
     '''
-    print('''
-    Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
-    This is free software with ABSOLUTELY NO WARRANTY''')
+    custom_fig = Figlet(font='graffiti')
+    print(custom_fig.renderText('Rsinc'))
+    print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
+    print('This is free software with ABSOLUTELY NO WARRANTY')
 
     recover = args.recovery
 
