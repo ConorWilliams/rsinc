@@ -16,11 +16,15 @@ from clint.textui import colored
 from .rsinc import sync, lsl, build_regexs, calc_states, make_dirs, Flat, track
 from .__init__ import __version__
 
+
 # ****************************************************************************
 # *                               Set-up/Parse                               *
 # ****************************************************************************
+def formatter(prog):
+    return argparse.HelpFormatter(prog, max_help_position=52)
 
-parser = argparse.ArgumentParser()
+
+parser = argparse.ArgumentParser(formatter_class=formatter)
 
 parser.add_argument("folders", help="Folders to sync", nargs='*')
 parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
