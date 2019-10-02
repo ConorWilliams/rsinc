@@ -204,7 +204,7 @@ def _have(nest, chain):
 CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
 
 # Read config and assign variables.
-if args.config == None:
+if args.config is None:
     config = read(CONFIG_FILE)
 else:
     config = read(args.config)
@@ -268,7 +268,6 @@ def main():
         write(MASTER, [[], [], empty()])
 
     history, ignores, nest = read(MASTER)
-
     history = set(history)
 
     # Find all the ignore files in lcl and save them.

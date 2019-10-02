@@ -342,7 +342,6 @@ def make_dirs(dirs):
     if NUMBER_OF_WORKERS == 1 or len(dirs) == 0:
         return
 
-    total = len(dirs)
     for d in tqdm(sorted(dirs, key=len), desc="mkdirs"):
         subprocess.run(['rclone', 'mkdir', d])
 
