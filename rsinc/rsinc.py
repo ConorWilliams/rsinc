@@ -267,6 +267,7 @@ def calc_states(old, new):
         if name in old.names:
             if old.names[name].uid != file.uid:
                 if file.uid in old.uids and not file.is_clone:
+                    # degenatate double move
                     file.moved = True
                     file.state = THESAME
                 else:
@@ -360,7 +361,7 @@ def match_states(lcl, rmt, recover):
 
     @return     None.
     """
-    names = tuple(sorted(lcl.names.keys()))
+    names = sorted(lcl.names.keys())
 
     for name in names:
         file = lcl.names[name]
@@ -395,11 +396,13 @@ def match_moves(old, lcl, rmt):
 
     @return     None.
     """
-    names = tuple(sorted(lcl.names.keys()))
+    global track
+
+    names = sorted(lcl.names.keys())
 
     for name in names:
         if name not in lcl.names:
-            # Caused by degenerate, double-move edge case.
+            # Caused by degenerate, double-move edge case triggering a rename.
             continue
         else:
             file = lcl.names[name]
@@ -428,7 +431,7 @@ def match_moves(old, lcl, rmt):
             elif name in old.names and (
                     old.names[name].uid in lcl.uids
             ) and lcl.uids[old.names[name].uid].moved:
-                # This deals is the degenerate, double-move edge case.
+                # This deals with the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 mvd_lcl.synced = True
 
@@ -438,6 +441,8 @@ def match_moves(old, lcl, rmt):
                 # Therefore rename rmt and procced with matching files move.
                 nn = resolve_case(name, rmt)
                 move(name, nn, rmt)
+                # Must wait for rename
+                track.pool.wait()
 
         trace, f_rmt = trace_rmt(file, old, rmt)
 
