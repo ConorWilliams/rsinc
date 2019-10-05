@@ -461,7 +461,11 @@ def match_moves(old, lcl, rmt):
             f_rmt.synced = True
             safe_move(name, f_rmt.name, lcl, rmt)
 
-        elif trace == CLONE or trace == NOTHERE:
+        elif trace == CLONE:
+            safe_push(name, lcl, rmt)
+
+        elif trace == NOTHERE:
+            # This should never happen?
             safe_push(name, lcl, rmt)
 
 
