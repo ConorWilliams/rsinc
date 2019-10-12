@@ -259,6 +259,12 @@ def main():
     for f in tmp:
         if BASE_L not in f:
             print(ylw('Rejecting:'), f, 'not in', BASE_L)
+        elif not os.path.isdir(f):
+            if strtobool(
+                    input(
+                        ylw('WARN: ') +
+                        f'{f} does not exist in local sync anyway? ')):
+                folders.append(f[len(BASE_L):])
         else:
             folders.append(f[len(BASE_L):])
 
