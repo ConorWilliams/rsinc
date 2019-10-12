@@ -1,6 +1,5 @@
 from time import sleep
 import subprocess
-import itertools
 
 
 class SubPool():
@@ -43,7 +42,7 @@ class SubPool():
             poll = proc.poll()
             if poll == 0:
                 return c
-            elif poll == None:
+            elif poll is None:
                 sleep(0.01)
                 continue
             else:

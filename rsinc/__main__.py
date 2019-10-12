@@ -10,16 +10,21 @@ from datetime import datetime
 
 import ujson as json
 import halo
+from pyfiglet import Figlet
 from clint.textui import colored
 
 from .rsinc import sync, lsl, build_regexs, calc_states, make_dirs, Flat, track
 from .__init__ import __version__
 
+
 # ****************************************************************************
 # *                               Set-up/Parse                               *
 # ****************************************************************************
+def formatter(prog):
+    return argparse.HelpFormatter(prog, max_help_position=52)
 
-parser = argparse.ArgumentParser()
+
+parser = argparse.ArgumentParser(formatter_class=formatter)
 
 parser.add_argument("folders", help="Folders to sync", nargs='*')
 parser.add_argument("-d", "--dry", action="store_true", help="Do a dry run")
@@ -199,7 +204,7 @@ def _have(nest, chain):
 CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
 
 # Read config and assign variables.
-if args.config == None:
+if args.config is None:
     config = read(CONFIG_FILE)
 else:
     config = read(args.config)
@@ -230,9 +235,10 @@ def main():
     '''
     Entry point for 'rsinc' as terminal command.
     '''
-    print('''
-    Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)
-    This is free software with ABSOLUTELY NO WARRANTY''')
+    custom_fig = Figlet(font='graffiti')
+    print(custom_fig.renderText('Rsinc'))
+    print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
+    print('This is free software with ABSOLUTELY NO WARRANTY')
 
     recover = args.recovery
 
@@ -262,7 +268,6 @@ def main():
         write(MASTER, [[], [], empty()])
 
     history, ignores, nest = read(MASTER)
-
     history = set(history)
 
     # Find all the ignore files in lcl and save them.
@@ -291,7 +296,7 @@ def main():
         path_rmt = BASE_R + folder + '/'
 
         # Determine if first run.
-        if folder in history:
+        if os.path.join(BASE_L, folder) in history:
             print(grn('Have:'), qt(folder) + ', entering sync & merge mode')
         else:
             print(ylw('Don\'t have:'),
@@ -300,6 +305,7 @@ def main():
 
         # Build relative regular expressions
         regexs, plain = build_regexs(path_lcl, ignores)
+        print('Ignore:', plain)
 
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
@@ -354,7 +360,7 @@ def main():
                 now = lsl(BASE_L + folder, HASH_NAME, regexs)
 
                 # Merge into history.
-                history.add(folder)
+                history.add(os.path.join(BASE_L, folder))
                 history.update(d for d in now.dirs)
 
                 # Merge into nest
