@@ -28,7 +28,7 @@ setuptools.setup(
     install_requires=['ujson', 'clint', 'halo', 'tqdm', 'pyfiglet'],
     entry_points={
         'console_scripts': [
-            'rsinc=rsinc.__main__:main',
+            'rsinc=rsinc.rsinc:main',
         ],
     },
     python_requires='>=3',

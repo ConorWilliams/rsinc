@@ -1,152 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
-import subprocess
-import logging
-import re
-
 from copy import deepcopy
-from clint.textui import colored
-from tqdm import tqdm
 
-from .SubPool import SubPool
-from .rclone import safe_push, safe_move, push, pull, move, LOGIC, resolve_case
+from .classes import SubPool
+from .rclone import safe_push, safe_move, move, resolve_case, track
+from .rclone import null, delL, delR, push, pull, conflict
+from .colors import red
 
 NUMBER_OF_WORKERS = 7
 
-cyn = colored.cyan  # in / to lcl
-mgt = colored.magenta  # in / to rmt
-ylw = colored.yellow  # delete
-red = colored.red  # conflict
-grn = colored.green  # regular msg
-
 THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
-NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4))
+NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4, 8))
 
-# ****************************************************************************
-# *                                  Classes                                 *
-# ****************************************************************************
-
-
-class File():
-    """
-    @brief      Class for to represent a file.
-    """
-    def __init__(self, name, uid, time, state, moved, is_clone, synced):
-        self.name = name
-        self.uid = uid
-        self.time = time
-
-        self.state = state
-        self.moved = moved
-        self.is_clone = is_clone
-        self.synced = synced
-
-    def dump(self):
-        """
-        @brief      Get all properties accept name.
-
-        @param      self  The object
-
-        @return     All file properties accept name.
-        """
-        return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
-
-
-class Flat():
-    """
-    @brief      Class to represent a directory of files.
-    """
-    def __init__(self, path):
-        self.path = path
-        self.names = {}
-        self.uids = {}
-        self.lower = set()
-        self.dirs = set()
-
-    def update(self,
-               name,
-               uid,
-               time=0,
-               state=THESAME,
-               moved=False,
-               is_clone=False,
-               synced=False):
-        """
-        @brief      Add a File to the Flat with specified properties.
-
-        @param      self      The object
-        @param      name      The name of the file
-        @param      uid       The uid of the file
-        @param      time      The modtime of the file
-        @param      state     The state of the file
-        @param      moved     Indicates file is moved
-        @param      is_clone  Indicates file is clone
-        @param      synced    Indicates file is synced
-
-        @return     None.
-        """
-
-        self.names.update(
-            {name: File(name, uid, time, state, moved, is_clone, synced)})
-        self.lower.add(name.lower())
-
-        d = os.path.split(name)[0]
-        d = os.path.join(self.path, d)
-        self.dirs.add(d)
-
-        if uid in self.uids:
-            self.names[name].is_clone = True
-            self.uids[uid].is_clone = True
-            self.uids.update({uid: self.names[name]})
-        else:
-            self.uids.update({uid: self.names[name]})
-
-    def clean(self):
-        """
-        @brief      Flags all files as unsynced.
-
-        @param      self  The object
-
-        @return     None.
-        """
-        for file in self.names.values():
-            file.synced = False
-
-    def rm(self, name):
-        """
-        @brief      Removes file from the Flat.
-
-        @param      self  The object
-        @param      name  The name of the file to delete
-
-        @return     None.
-        """
-        if not self.names[name].is_clone:
-            del self.uids[self.names[name].uid]
-
-        del self.names[name]
-        self.lower.remove(name.lower())
-
-
-class Struct():
-    def __init__(self):
-        self.count = 0
-        self.total = 0
-        self.lcl = None
-        self.rmt = None
-        self.dry = True
-        self.case = True
-        self.pool = None
-        self.rclone_flags = []
-
-
-track = Struct()  # global used to track how many operations sync needs.
-
-# ****************************************************************************
-# *                                 Functions                                *
-# ****************************************************************************
+# Encodes logic for match states function.
+LOGIC = [
+    [null, pull, delL, conflict],
+    [push, conflict, push, conflict],
+    [delR, pull, null, pull],
+    [conflict, conflict, push, conflict],
+]
 
 
 def calc_states(old, new):
@@ -186,7 +59,14 @@ def calc_states(old, new):
             file.state = CREATED
 
 
-def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
+def sync(lcl,
+         rmt,
+         old=None,
+         recover=False,
+         dry_run=True,
+         total=0,
+         case=True,
+         flags=[]):
     """
     @brief      Main sync function runs appropriate sync depending on arguments.
 
@@ -210,6 +90,7 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     track.case = case
     track.count = 0
     track.pool = SubPool(NUMBER_OF_WORKERS)
+    track.rclone_flags = flags
 
     cp_lcl = deepcopy(lcl)
     cp_rmt = deepcopy(rmt)
@@ -233,25 +114,6 @@ def sync(lcl, rmt, old=None, recover=False, dry_run=True, total=0, case=True):
     dirs = (cp_lcl.dirs - lcl.dirs) | (cp_rmt.dirs - rmt.dirs)
 
     return track.count, dirs
-
-
-def make_dirs(dirs):
-    """
-    @brief      Makes new directories
-
-    @param      dirs  List of directories to mkdir
-
-    @return     None.
-    """
-    global track
-
-    if NUMBER_OF_WORKERS == 1 or len(dirs) == 0:
-        return
-
-    for d in tqdm(sorted(dirs, key=len), desc="mkdirs"):
-        subprocess.run(['rclone', 'mkdir', d])
-
-    track.pool.wait()
 
 
 def match_states(lcl, rmt, recover):
