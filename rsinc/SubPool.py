@@ -24,7 +24,7 @@ class SubPool():
             return
         else:
             done = None
-            while done == None:
+            while done is None:
                 done = self._find_done_process()
 
             self.procs.pop(done).terminate()

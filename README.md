@@ -27,6 +27,8 @@ Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc@sta
 
 Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 
+**IMPORTANT** you must check the hash used (see config `HASH_NAME` below) is configured corectly to a hash avaliable on **BOTH** local and remote.
+
 Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like this by default:
 
 ```json {
