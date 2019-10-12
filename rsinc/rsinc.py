@@ -15,6 +15,7 @@ from tqdm import tqdm
 from .SubPool import SubPool
 
 NUMBER_OF_WORKERS = 7
+RCLONE_ENCODING = "UTF-8"
 
 cyn = colored.cyan  # in / to lcl
 mgt = colored.magenta  # in / to rmt
@@ -208,13 +209,20 @@ def lsl(path, hash_name, regexs=[]):
     """
     global track
 
-    command = ['rclone', 'lsjson', '-R', '--files-only', '--hash', path]
-
+    command = ['rclone', 'lsjson', '-R', '--files-only', path]
     subprocess.run(['rclone', 'mkdir', path])
-
     result = subprocess.Popen(command + track.rclone_flags,
                               stdout=subprocess.PIPE)
     list_of_dicts = json.load(result.stdout)
+
+    command = ['rclone', 'hashsum', hash_name, path]
+    result = subprocess.Popen(command, stdout=subprocess.PIPE)
+    hashes = {}
+
+    for file in result.stdout:
+        decode = file.decode(RCLONE_ENCODING).strip()
+        tmp = decode.split('  ', 1)
+        hashes[tmp[1]] = tmp[0]
 
     out = Flat(path)
     for d in list_of_dicts:
@@ -223,9 +231,16 @@ def lsl(path, hash_name, regexs=[]):
             time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
 
             hashsize = str(d['Size'])
-            hashsize += d['Hashes'][hash_name]
+
+            hash = hashes.get(d['Path'], None)
+            if hash is not None:
+                hashsize += hash
+            else:
+                print(red('ERROR:'), "can\'t find", d['Path'], 'hash')
+                continue
 
             out.update(d['Path'], hashsize, time)
+
     return out
 
 
