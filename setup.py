@@ -25,7 +25,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/ConorWilliams/rsinc",
     packages=setuptools.find_packages(),
-    install_requires=['ujson', 'clint', 'halo', 'tqdm', 'pyfiglet'],
+    install_requires=[
+        'ujson', 'clint', 'halo', 'tqdm', 'pyfiglet', 'tonyg-rfc3339'
+    ],
     entry_points={
         'console_scripts': [
             'rsinc=rsinc.rsinc:main',

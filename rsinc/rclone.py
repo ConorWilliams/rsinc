@@ -2,10 +2,10 @@
 
 import subprocess
 import ujson as json
-from datetime import datetime
 import logging
 import os
 
+from rfc3339 import strtotimestamp
 from tqdm import tqdm
 
 from .classes import Flat, Struct
@@ -105,9 +105,7 @@ def lsl(path, hash_name, regexs=[]):
     out = Flat(path)
     for d in list_of_dicts:
         if not any(r.match(d['Path']) for r in regexs):
-            time = d['ModTime'][:19]
-            time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S").timestamp()
-
+            time = strtotimestamp(d['ModTime'])
             hashsize = str(d['Size'])
 
             hash = hashes.get(d['Path'], None)
