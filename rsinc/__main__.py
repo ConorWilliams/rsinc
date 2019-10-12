@@ -281,8 +281,6 @@ def main():
         search = os.path.normpath(BASE_L + "/**/.rignore")
         ignores = glob.glob(search, recursive=True)
         write(MASTER, (history, ignores, nest))
-        regexs, plain = build_regexs(BASE_L, ignores)
-        print("Ignoring:", plain)
 
     # Detect crashes.
     if os.path.exists(TEMP_FILE):
@@ -363,7 +361,10 @@ def main():
                 spin.start(grn('Saving: ') + qt(folder))
 
                 # Get post sync state
-                now = lsl(BASE_L + folder, HASH_NAME, regexs)
+                if total == 0:
+                    now = lcl
+                else:
+                    now = lsl(BASE_L + folder, HASH_NAME, regexs)
 
                 # Merge into history.
                 history.add(os.path.join(BASE_L, folder))
