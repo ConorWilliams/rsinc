@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 import os
 
-import tqdm
+from tqdm import tqdm
 
 from .classes import Flat, Struct
 from .colors import red, mgt, cyn, ylw

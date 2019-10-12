@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# main entry point for rsinc
 
 import argparse
 import os
@@ -21,6 +20,51 @@ from .colors import grn, ylw, red
 
 from .__init__ import __version__
 
+# ****************************************************************************
+# *                                 Functions                                *
+# ****************************************************************************
+
+
+def qt(string):
+    return '"' + string + '"'
+
+
+def read(file):
+    '''Reads json do dict and returns dict.'''
+    with open(file, 'r') as fp:
+        d = json.load(fp)
+
+    return d
+
+
+def write(file, d):
+    '''Writes dict to json'''
+    with open(file, 'w') as fp:
+        json.dump(d, fp, sort_keys=True, indent=2)
+
+
+STB = (
+    'yes',
+    'ye',
+    'y',
+    '1',
+    't',
+    'true',
+    '',
+    'go',
+    'please',
+    'fire away',
+    'punch it',
+    'sure',
+    'ok',
+    'hell yes',
+)
+
+
+def strtobool(string):
+    return string.lower() in STB
+
+
 ESCAPE = {
     '\\': '\\\\',
     '.': '\\.',
@@ -32,9 +76,44 @@ ESCAPE = {
 }
 
 
+def build_regexs(path, files):
+    """
+    @brief      Compiles relative regexs.
+
+    @param      path   The path of the current lsl search
+    @param      files  List of absolute paths to .rignore files
+
+    @return     List of compiled relative reqexes and list of plain text
+                relative regexes.
+    """
+    regex = []
+    plain = []
+
+    for file in files:
+        for f_char, p_char in zip(os.path.split(file)[0], path):
+            if f_char != p_char:
+                break
+        else:
+            if os.path.exists(file):
+                base = []
+                for char in os.path.split(file)[0][len(path):]:
+                    base.append(ESCAPE.get(char, char))
+                base = ''.join(base)
+
+                with open(file, 'r') as fp:
+                    for line in fp:
+                        r = os.path.join(base, line.rstrip())
+                        plain.append(r)
+                        regex.append(re.compile(r))
+
+    return regex, plain
+
+
 # ****************************************************************************
 # *                               Set-up/Parse                               *
 # ****************************************************************************
+
+
 def formatter(prog):
     return argparse.HelpFormatter(prog, max_help_position=52)
 
@@ -83,84 +162,6 @@ dry_run = args.dry
 auto = args.auto
 
 spin = halo.Halo(spinner='dots', placement='right', color='yellow')
-
-# ****************************************************************************
-# *                                 Functions                                *
-# ****************************************************************************
-
-
-def qt(string):
-    return '"' + string + '"'
-
-
-def read(file):
-    '''Reads json do dict and returns dict.'''
-    with open(file, 'r') as fp:
-        d = json.load(fp)
-
-    return d
-
-
-def write(file, d):
-    '''Writes dict to json'''
-    with open(file, 'w') as fp:
-        json.dump(d, fp, sort_keys=True, indent=2)
-
-
-STB = (
-    'yes',
-    'ye',
-    'y',
-    '1',
-    't',
-    'true',
-    '',
-    'go',
-    'please',
-    'fire away',
-    'punch it',
-    'sure',
-    'ok',
-    'hell yes',
-)
-
-
-def strtobool(string):
-    return string.lower() in STB
-
-
-def build_regexs(path, files):
-    """
-    @brief      Compiles relative regexs.
-
-    @param      path   The path of the current lsl search
-    @param      files  List of absolute paths to .rignore files
-
-    @return     List of compiled relative reqexes and list of plain text
-                relative regexes.
-    """
-    regex = []
-    plain = []
-
-    for file in files:
-        for f_char, p_char in zip(os.path.split(file)[0], path):
-            if f_char != p_char:
-                break
-        else:
-            if os.path.exists(file):
-                base = []
-                for char in os.path.split(file)[0][len(path):]:
-                    base.append(ESCAPE.get(char, char))
-                base = ''.join(base)
-
-                with open(file, 'r') as fp:
-                    for line in fp:
-                        r = os.path.join(base, line.rstrip())
-                        plain.append(r)
-                        regex.append(re.compile(r))
-
-    return regex, plain
-
 
 # ****************************************************************************
 # *                              Configuration                               *
@@ -329,6 +330,7 @@ def main():
 
                 # Get post sync state
                 if total == 0:
+                    print("Skipping crawl as no jobs")
                     now = lcl
                 else:
                     now = lsl(BASE_L + folder, HASH_NAME, regexs)
