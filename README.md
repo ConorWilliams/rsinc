@@ -1,6 +1,6 @@
 # Rsinc
 
-Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. Rsinc tracks file moves and saves bandwidth. Rsinc (in normal mode) uses only file hashes and sizes to track files thus avoiding unreliable time stamps. I hope rsinc's source is succinct enough (\~600 sloc across two files) to make modifying rsinc to your own needs easy.
+Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [rclone](https://github.com/ncw/rclone) as its back-end while the synchronisation logic is carried out in Python. Rsinc tracks file moves and saves bandwidth. Rsinc (in normal mode) uses only file hashes and sizes to track files thus avoiding unreliable time stamps. I hope rsinc's source is succinct enough (\~800 sloc) to make modifying rsinc to your own needs easy.
 
 ## Features
 
@@ -27,7 +27,7 @@ Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc@sta
 
 Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 
-**IMPORTANT:** you must check the hash used (see config `HASH_NAME` below) is configured corectly to a hash avaliable on **both** local and remote.
+Upon first run rsinc will launch the interactive configurer.
 
 Open the config file, `~/.rsinc/config.json` and modify as appropriate. It should look something like this by default:
 
@@ -49,18 +49,18 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 }
 ```
 
-- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to. Note `BASE_L` **_should_** include the trailing backslash as above.
-- `BASE_R` is the name of your rclone remote. Note `BASE_R` **_should_** include the trailing colon (or backslash is you want root to be a sub folder in remote) as above.
+- `BASE_L` is the absolute path to the local 'root' that your remote will be synced to.
+- `BASE_R` is the name of your rclone remote. Note `BASE_R` **_should_** include the trailing colon.
 - `CASE_INSENSATIVE` is a boolean flag that controls the case checking. If both remote and local have the same case sensitivity this can be set to false, else set true.
 - `DEFAULT_DIRS` are a list of first level directories inside `BASE_L` and `BASE_R` which are synced when run with the `-D` or `--default` flags.
-- `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported.
+- `HASH_NAME` is the name of the hash function used to detect file changes, run `rclone lsjson --hash 'BASE_R/path_to_file'` for available hash functions. SHA-1 seems to be the most widely supported. The interactive configurer should set this automatically.
 - `LOG_FOLDER` is the path where log files will be written to.
 - `MASTER` is the file that will store an image of the local files at the last run, a history of previously synced directories and paths to .rignore files.
 - `TEMP_FILE` is a file used to detect if rsinc has crashed during a run.
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir. If no paths are supplied then the current working directory will be synced. For example running `rsinc ~/Documents` will syncronise `~/Documents` to `onedrive:Documents` assuming `BASE_L = ~/` and `BASE_R = onedrive:`.  
+Run rsinc with: `rsinc 'path1' 'path2' 'path3' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir. If no paths are supplied then the current working directory will be synced. For example running `rsinc ~/Documents` will syncronise `~/Documents` to `onedrive:Documents` assuming `BASE_L = ~/` and `BASE_R = onedrive:`.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
@@ -80,7 +80,8 @@ The optional arguments available are:
 *  -a, --auto, automatically applies changes without requesting permission.
 *  -p, --purge, deletes the master file resulting in a **total reset** of all tracking.
 *  -i, --ignore, find `.rignore` files and add them to the ignore list. Flag must be set to find new `.rignore` files.
-*  --config, enter path to a config file, defaults to `~/.rsinc/config.json`.
+*  --congig, launch the interactive configurer.
+*  --config_path, enter path to a config file, defaults to `~/.rsinc/config.json`.
 
 Any remaining arguments/flags will be passed through to all rclone commands rsinc calls. Note a path must be supplied to rsinc when supplying additional flags instead of relying on the implicit current working directory (which can be explicitly called with `.`).
 

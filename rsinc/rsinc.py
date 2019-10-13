@@ -147,19 +147,16 @@ parser.add_argument(
     "-p", "--purge", help="Reset history for all folders", action="store_true"
 )
 parser.add_argument(
-    "-i",
-    "--ignore",
-    help="Find .rignore and add their contents to ignore list",
-    action="store_true",
+    "-i", "--ignore", help="Find .rignore files", action="store_true"
 )
 parser.add_argument(
     "-v", "--version", action="version", version=f"rsinc version: {__version__}"
 )
 parser.add_argument(
-    "--config_path", help="Path to config file (default ~/.rsinc/config.json)"
+    "--config", action="store_true", help="Enter interactive CLI configurer"
 )
 parser.add_argument(
-    "--config", action="store_true", help="Enter interactive CLI configurer"
+    "--config_path", help="Path to config file (default ~/.rsinc/config.json)"
 )
 parser.add_argument(
     "args",
