@@ -323,7 +323,7 @@ def delL(name_s, name_d, flat_s, flat_d):
     global track
     track.count += 1
 
-    info = ylw("Delete: ") + flat_s.path + name_s
+    info = ylw("Delete: ") + os.path.join(flat_s.path, name_s)
 
     if not track.dry:
         print("%d/%d" % (track.count, track.total), info)
