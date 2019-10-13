@@ -33,7 +33,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ```json {
  {
-    "BASE_L": "/home/conor/",
+    "BASE_L": "/home/conor",
     "BASE_R": "onedrive:",
     "CASE_INSENSATIVE": true,
     "DEFAULT_DIRS": [
@@ -60,7 +60,7 @@ Open the config file, `~/.rsinc/config.json` and modify as appropriate. It shoul
 
 ## Using
 
-Run rsinc with: `rsinc 'path1' 'path2' 'path3' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir. If no paths are supplied then the current working directory will be synced. For example running `rsinc ~/Documents` will syncronise `~/Documents` to `onedrive:Documents` assuming `BASE_L = ~/` and `BASE_R = onedrive:`.  
+Run rsinc with: `rsinc 'path1' 'path2' 'path3' 'etc'` where `path1`, `path2` are (relative) paths to folders/directories (**not files**) in `BASE_L` or `BASE_R` to synced. Alternatively type a full path starting with a `/` (i.e `~/some/path/here`) and rsinc will not convert it to a relative path. If any of the paths do not exist in either local or remote rsinc will mkdir. If no paths are supplied then the current working directory will be synced. For example running `rsinc ~/Documents` will syncronise `~/Documents` to `onedrive:Documents` assuming `BASE_L = ~/` and `BASE_R = onedrive:`.  
 
 Rsinc will scan the paths and print to the terminal all the actions it will take. Rsinc will then present a (y/n) input to confirm if you want to proceed with those actions.
 
