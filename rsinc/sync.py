@@ -24,7 +24,7 @@ def sync(
     dry_run=True,
     total=0,
     case=True,
-    flags=[],
+    flags=None,
 ):
     global track
 
@@ -35,7 +35,7 @@ def sync(
     track.case = case
     track.count = 0
     track.pool = SubPool(NUMBER_OF_WORKERS)
-    track.rclone_flags = flags
+    track.rclone_flags = [] if flags is None else flags
 
     cp_lcl = deepcopy(lcl)
     cp_rmt = deepcopy(rmt)
