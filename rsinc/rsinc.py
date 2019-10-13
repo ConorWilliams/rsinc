@@ -21,17 +21,13 @@ from .config import config_cli
 
 from .__init__ import __version__
 
-spin = halo.Halo(spinner="dots", placement="right", color="yellow")
+SPIN = halo.Halo(spinner="dots", placement="right", color="yellow")
 CONFIG_FILE = os.path.expanduser("~/.rsinc/config.json")  # Default config path
 
 custom_fig = Figlet(font="graffiti")
 print(custom_fig.renderText("Rsinc"))
 print("Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)")
 print("This is free software with ABSOLUTELY NO WARRANTY")
-
-# ****************************************************************************
-# *                                 Functions                                *
-# ****************************************************************************
 
 
 def qt(string):
@@ -52,44 +48,8 @@ def write(file, d):
         json.dump(d, fp, sort_keys=True, indent=2)
 
 
-STB = (
-    "yes",
-    "ye",
-    "y",
-    "1",
-    "t",
-    "true",
-    "",
-    "go",
-    "please",
-    "fire away",
-    "punch it",
-    "sure",
-    "ok",
-    "hell yes",
-)
-
-
 def strtobool(string):
     return string.lower() in STB
-
-
-ESCAPE = {
-    "\\": "\\\\",
-    ".": "\\.",
-    "^": "\\^",
-    "$": "\\$",
-    "*": "\\*",
-    "+": "\\+",
-    "?": "\\?",
-    "|": "\\|",
-    "(": "\\(",
-    ")": "\\)",
-    "{": "\\{",
-    "}": "\\}",
-    "[": "\\[",
-    "]": "\\]",
-}
 
 
 def escape(string):
@@ -97,42 +57,6 @@ def escape(string):
     for char in string:
         tmp.append(ESCAPE.get(char, char))
     return "".join(tmp)
-
-
-def build_regexs(BASE_L, BASE_R, path_lcl, files):
-    """
-    @brief      Compiles relative regexs.
-
-    @param      path   The path of the current lsl search
-    @param      files  List of absolute paths to .rignore files
-
-    @return     List of compiled relative reqexes and list of plain text
-                relative regexes.
-    """
-    lcl_regex = []
-    rmt_regex = []
-    plain = []
-
-    for file in files:
-        for f_char, p_char in zip(os.path.dirname(file), path_lcl):
-            if f_char != p_char:
-                break
-        else:
-            if os.path.exists(file):
-                with open(file, "r") as fp:
-                    for line in fp:
-                        mid = os.path.dirname(file)
-                        mid = mid[len(BASE_L) + 1 :]
-                        mid = os.path.join(escape(mid), line.rstrip())
-
-                        lcl = os.path.join(escape(BASE_L), mid)
-                        rmt = os.path.join(escape(BASE_R), mid)
-
-                        plain.append(mid)
-                        lcl_regex.append(re.compile(lcl))
-                        rmt_regex.append(re.compile(rmt))
-
-    return rmt_regex, lcl_regex, plain
 
 
 # ****************************************************************************
@@ -183,8 +107,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-dry_run = args.dry
-auto = args.auto
 
 # ****************************************************************************
 # *                              Configuration                               *
@@ -227,6 +149,8 @@ def main():
     # Entry point for 'rsinc' as terminal command.
 
     recover = args.recovery
+    dry_run = args.dry
+    auto = args.auto
 
     # Decide which folder(s) to sync.
     if args.default:
@@ -301,13 +225,13 @@ def main():
         print("Ignore:", plain)
 
         # Scan directories.
-        spin.start(("Crawling: ") + qt(folder))
+        SPIN.start(("Crawling: ") + qt(folder))
 
         lcl = lsl(path_lcl, HASH_NAME)
         rmt = lsl(path_rmt, HASH_NAME)
         old = Flat(path_lcl)
 
-        spin.stop_and_persist(symbol="✔")
+        SPIN.stop_and_persist(symbol="✔")
 
         lcl.tag_ignore(lcl_regexs)
         rmt.tag_ignore(rmt_regexs)
@@ -357,7 +281,7 @@ def main():
                     flags=args.args,
                 )
 
-                spin.start(grn("Saving: ") + qt(folder))
+                SPIN.start(grn("Saving: ") + qt(folder))
 
                 # Get post sync state
                 if total == 0:
@@ -379,15 +303,78 @@ def main():
 
                 subprocess.run(["rm", TEMP_FILE])
 
-                spin.stop_and_persist(symbol="✔")
+                SPIN.stop_and_persist(symbol="✔")
 
         if args.clean:
-            spin.start(grn("Pruning: ") + qt(folder))
+            SPIN.start(grn("Pruning: ") + qt(folder))
             subprocess.run(["rclone", "rmdirs", path_rmt])
             subprocess.run(["rclone", "rmdirs", path_lcl])
-            spin.stop_and_persist(symbol="✔")
+            SPIN.stop_and_persist(symbol="✔")
 
         recover = args.recovery
 
     print("")
     print(grn("All synced!"))
+
+
+def build_regexs(BASE_L, BASE_R, path_lcl, files):
+    lcl_regex = []
+    rmt_regex = []
+    plain = []
+
+    for file in files:
+        for f_char, p_char in zip(os.path.dirname(file), path_lcl):
+            if f_char != p_char:
+                break
+        else:
+            if os.path.exists(file):
+                with open(file, "r") as fp:
+                    for line in fp:
+                        mid = os.path.dirname(file)
+                        mid = mid[len(BASE_L) + 1 :]
+                        mid = os.path.join(escape(mid), line.rstrip())
+
+                        lcl = os.path.join(escape(BASE_L), mid)
+                        rmt = os.path.join(escape(BASE_R), mid)
+
+                        plain.append(mid)
+                        lcl_regex.append(re.compile(lcl))
+                        rmt_regex.append(re.compile(rmt))
+
+    return rmt_regex, lcl_regex, plain
+
+
+STB = (
+    "yes",
+    "ye",
+    "y",
+    "1",
+    "t",
+    "true",
+    "",
+    "go",
+    "please",
+    "fire away",
+    "punch it",
+    "sure",
+    "ok",
+    "hell yes",
+)
+
+
+ESCAPE = {
+    "\\": "\\\\",
+    ".": "\\.",
+    "^": "\\^",
+    "$": "\\$",
+    "*": "\\*",
+    "+": "\\+",
+    "?": "\\?",
+    "|": "\\|",
+    "(": "\\(",
+    ")": "\\)",
+    "{": "\\{",
+    "}": "\\}",
+    "[": "\\[",
+    "]": "\\]",
+}
