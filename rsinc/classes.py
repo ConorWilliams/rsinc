@@ -8,10 +8,11 @@ from time import sleep
 THESAME = 0  # Must match THESAME in sync.py
 
 
-class SubPool():
+class SubPool:
     """
     @brief      Class to coordinate a pool of worker subprocess Processes
     """
+
     def __init__(self, max_workers):
         self.procs = []
         self.max_workers = max_workers
@@ -52,7 +53,7 @@ class SubPool():
                 sleep(0.01)
                 continue
             else:
-                print('Error polled:', poll, 'with', proc.args)
+                print("Error polled:", poll, "with", proc.args)
                 return c
 
         return None
@@ -72,10 +73,11 @@ class SubPool():
         self.procs = []
 
 
-class File():
+class File:
     """
     @brief      Class for to represent a file.
     """
+
     def __init__(self, name, uid, time, state, moved, is_clone, synced):
         self.name = name
         self.uid = uid
@@ -94,13 +96,21 @@ class File():
 
         @return     All file properties accept name.
         """
-        return self.uid, self.time, self.state, self.moved, self.is_clone, self.synced
+        return (
+            self.uid,
+            self.time,
+            self.state,
+            self.moved,
+            self.is_clone,
+            self.synced,
+        )
 
 
-class Flat():
+class Flat:
     """
     @brief      Class to represent a directory of files.
     """
+
     def __init__(self, path):
         self.path = path
         self.names = {}
@@ -108,14 +118,16 @@ class Flat():
         self.lower = set()
         self.dirs = set()
 
-    def update(self,
-               name,
-               uid,
-               time=0,
-               state=THESAME,
-               moved=False,
-               is_clone=False,
-               synced=False):
+    def update(
+        self,
+        name,
+        uid,
+        time=0,
+        state=THESAME,
+        moved=False,
+        is_clone=False,
+        synced=False,
+    ):
         """
         @brief      Add a File to the Flat with specified properties.
 
@@ -132,7 +144,8 @@ class Flat():
         """
 
         self.names.update(
-            {name: File(name, uid, time, state, moved, is_clone, synced)})
+            {name: File(name, uid, time, state, moved, is_clone, synced)}
+        )
         self.lower.add(name.lower())
 
         d = os.path.split(name)[0]
@@ -173,7 +186,7 @@ class Flat():
         self.lower.remove(name.lower())
 
 
-class Struct():
+class Struct:
     def __init__(self):
         self.count = 0
         self.total = 0

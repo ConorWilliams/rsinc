@@ -32,7 +32,7 @@ def make_dirs(dirs):
         return
 
     for d in tqdm(sorted(dirs, key=len), desc="mkdirs"):
-        subprocess.run(['rclone', 'mkdir', d])
+        subprocess.run(["rclone", "mkdir", d])
 
     track.pool.wait()
 
@@ -46,9 +46,9 @@ def prepend(name, prefix):
 
     @return     Path to file with new name.
     """
-    new_name = name.split('/')
+    new_name = name.split("/")
     new_name[-1] = prefix + new_name[-1]
-    new_name = '/'.join(new_name)
+    new_name = "/".join(new_name)
     return new_name
 
 
@@ -65,10 +65,10 @@ def resolve_case(name, flat):
 
     if track.case:
         while new_name.lower() in flat.lower:
-            new_name = prepend(new_name, '_')
+            new_name = prepend(new_name, "_")
     else:
         while new_name in flat.names:
-            new_name = prepend(new_name, '_')
+            new_name = prepend(new_name, "_")
 
     return new_name
 
@@ -87,35 +87,36 @@ def lsl(path, hash_name, regexs=[]):
     """
     global track
 
-    command = ['rclone', 'lsjson', '-R', '--files-only', path]
-    subprocess.run(['rclone', 'mkdir', path])
-    result = subprocess.Popen(command + track.rclone_flags,
-                              stdout=subprocess.PIPE)
+    command = ["rclone", "lsjson", "-R", "--files-only", path]
+    subprocess.run(["rclone", "mkdir", path])
+    result = subprocess.Popen(
+        command + track.rclone_flags, stdout=subprocess.PIPE
+    )
     list_of_dicts = json.load(result.stdout)
 
-    command = ['rclone', 'hashsum', hash_name, path]
+    command = ["rclone", "hashsum", hash_name, path]
     result = subprocess.Popen(command, stdout=subprocess.PIPE)
     hashes = {}
 
     for file in result.stdout:
         decode = file.decode(RCLONE_ENCODING).strip()
-        tmp = decode.split('  ', 1)
+        tmp = decode.split("  ", 1)
         hashes[tmp[1]] = tmp[0]
 
     out = Flat(path)
     for d in list_of_dicts:
-        if not any(r.match(d['Path']) for r in regexs):
-            time = strtotimestamp(d['ModTime'])
-            hashsize = str(d['Size'])
+        if not any(r.match(d["Path"]) for r in regexs):
+            time = strtotimestamp(d["ModTime"])
+            hashsize = str(d["Size"])
 
-            hash = hashes.get(d['Path'], None)
+            hash = hashes.get(d["Path"], None)
             if hash is not None:
                 hashsize += hash
             else:
-                print(red('ERROR:'), "can\'t find", d['Path'], 'hash')
+                print(red("ERROR:"), "can't find", d["Path"], "hash")
                 continue
 
-            out.update(d['Path'], hashsize, time)
+            out.update(d["Path"], hashsize, time)
 
     return out
 
@@ -133,7 +134,7 @@ def safe_push(name, flat_s, flat_d):
     """
     global track
 
-    old = ''
+    old = ""
     new = name
 
     pair = [flat_s, flat_d]
@@ -165,7 +166,7 @@ def safe_move(name_s, name_d, flat_in, flat_mirror):
 
     @return     None.
     """
-    old = ''
+    old = ""
     new = name_d
 
     pair = [flat_in, flat_mirror]
@@ -202,18 +203,20 @@ def move(name_s, name_d, flat):
         col = mgt
 
     if os.path.split(name_s)[0] == os.path.split(name_d)[0]:
-        text = 'Rename:'
+        text = "Rename:"
     else:
         text = "Move:"
 
-    info = col(text) + ' (%s) ' % base + name_s + col(' to: ') + name_d
+    info = col(text) + " (%s) " % base + name_s + col(" to: ") + name_d
     text = text.ljust(10)
 
     if not track.dry:
-        print('%d/%d' % (track.count, track.total), info)
-        log.info('%s(%s) %s TO %s', text.upper(), base, name_s, name_d)
-        track.pool.run(['rclone', 'moveto', base + name_s, base + name_d] +
-                       track.rclone_flags)
+        print("%d/%d" % (track.count, track.total), info)
+        log.info("%s(%s) %s TO %s", text.upper(), base, name_s, name_d)
+        track.pool.run(
+            ["rclone", "moveto", base + name_s, base + name_d]
+            + track.rclone_flags
+        )
     else:
         print(info)
 
@@ -237,20 +240,20 @@ def push(name_s, name_d, flat_s, flat_d):
     track.count += 1
 
     if flat_s.path == track.lcl and flat_d.path == track.rmt:
-        text = 'Push:'
+        text = "Push:"
         col = mgt
 
     elif flat_s.path == track.rmt and flat_d.path == track.lcl:
-        text = 'Pull:'
+        text = "Pull:"
         col = cyn
 
-    info = col('%s ' % text) + name_d
+    info = col("%s " % text) + name_d
     text = text.ljust(10)
 
     if not track.dry:
-        print('%d/%d' % (track.count, track.total), info)
-        log.info('%s%s', text.upper(), name_d)
-        cmd = ['rclone', 'copyto', flat_s.path + name_s, flat_d.path + name_d]
+        print("%d/%d" % (track.count, track.total), info)
+        log.info("%s%s", text.upper(), name_d)
+        cmd = ["rclone", "copyto", flat_s.path + name_s, flat_d.path + name_d]
         track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)
@@ -274,14 +277,16 @@ def conflict(name_s, name_d, flat_s, flat_d):
     global track
 
     print(
-        red('Conflict: ') + '%d:%d: %s' %
-        (flat_s.names[name_s].state, flat_d.names[name_d].state, name_s), )
+        red("Conflict: ")
+        + "%d:%d: %s"
+        % (flat_s.names[name_s].state, flat_d.names[name_d].state, name_s)
+    )
 
     if not track.dry:
-        log.info('CONFLICT: %s', name_s)
+        log.info("CONFLICT: %s", name_s)
 
-    nn_s = resolve_case(prepend(name_s, 'lcl_'), flat_s)
-    nn_d = resolve_case(prepend(name_d, 'rmt_'), flat_d)
+    nn_s = resolve_case(prepend(name_s, "lcl_"), flat_s)
+    nn_d = resolve_case(prepend(name_d, "rmt_"), flat_d)
 
     move(name_s, nn_s, flat_s)
     move(name_d, nn_d, flat_d)
@@ -308,12 +313,12 @@ def delL(name_s, name_d, flat_s, flat_d):
     global track
     track.count += 1
 
-    info = ylw('Delete: ') + flat_s.path + name_s
+    info = ylw("Delete: ") + flat_s.path + name_s
 
     if not track.dry:
-        print('%d/%d' % (track.count, track.total), info)
-        log.info('DELETE:   %s', flat_s.path + name_s)
-        cmd = ['rclone', 'delete', flat_s.path + name_s]
+        print("%d/%d" % (track.count, track.total), info)
+        log.info("DELETE:   %s", flat_s.path + name_s)
+        cmd = ["rclone", "delete", flat_s.path + name_s]
         track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)

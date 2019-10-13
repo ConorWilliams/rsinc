@@ -35,8 +35,9 @@ def calc_states(old, new):
     new_before_deletes = tuple(new.names.keys())
 
     for name, file in old.names.items():
-        if name not in new.names and (file.uid not in new.uids
-                                      or file.is_clone):
+        if name not in new.names and (
+            file.uid not in new.uids or file.is_clone
+        ):
             # Want all clone-moves to leave delete place holders.
             new.update(name, file.uid, file.time, DELETED)
 
@@ -59,14 +60,16 @@ def calc_states(old, new):
             file.state = CREATED
 
 
-def sync(lcl,
-         rmt,
-         old=None,
-         recover=False,
-         dry_run=True,
-         total=0,
-         case=True,
-         flags=[]):
+def sync(
+    lcl,
+    rmt,
+    old=None,
+    recover=False,
+    dry_run=True,
+    total=0,
+    case=True,
+    flags=[],
+):
     """
     @brief      Main sync function runs appropriate sync depending on arguments.
 
@@ -150,7 +153,7 @@ def match_states(lcl, rmt, recover):
         elif file.state != DELETED:
             safe_push(name, lcl, rmt)
         else:
-            print(red("WARN:"), 'unpaired deleted:', lcl.path, name)
+            print(red("WARN:"), "unpaired deleted:", lcl.path, name)
 
 
 def match_moves(old, lcl, rmt):
@@ -195,9 +198,11 @@ def match_moves(old, lcl, rmt):
                 file.state = UPDATED
                 rmt.names[name].state = UPDATED
                 continue
-            elif name in old.names and (
-                    old.names[name].uid in lcl.uids
-            ) and lcl.uids[old.names[name].uid].moved:
+            elif (
+                name in old.names
+                and (old.names[name].uid in lcl.uids)
+                and lcl.uids[old.names[name].uid].moved
+            ):
                 # This deals with the degenerate, double-move edge case.
                 mvd_lcl = lcl.uids[old.names[name].uid]
                 mvd_lcl.synced = True
