@@ -19,44 +19,6 @@ LOGIC = [
 ]
 
 
-def calc_states(old, new):
-    """
-    @brief      Calculates if files on one side have been updated, moved,
-                deleted, created or stayed the same.
-
-    @param      old   Flat of the past state of a directory
-    @param      old   Flat of the past state of a directory
-
-    @return     None.
-    """
-    new_before_deletes = tuple(new.names.keys())
-
-    for name, file in old.names.items():
-        if name not in new.names and (
-            file.uid not in new.uids or file.is_clone
-        ):
-            # Want all clone-moves to leave delete place holders.
-            new.update(name, file.uid, file.time, DELETED)
-
-    for name in new_before_deletes:
-        file = new.names[name]
-        if name in old.names:
-            if old.names[name].uid != file.uid:
-                if file.uid in old.uids and not file.is_clone:
-                    # degenatate double move
-                    file.moved = True
-                    file.state = THESAME
-                else:
-                    file.state = UPDATED
-            else:
-                file.state = THESAME
-        elif file.uid in old.uids and not file.is_clone:
-            file.moved = True
-            file.state = THESAME
-        else:
-            file.state = CREATED
-
-
 def sync(
     lcl,
     rmt,
@@ -114,6 +76,44 @@ def sync(
     dirs = (cp_lcl.dirs - lcl.dirs) | (cp_rmt.dirs - rmt.dirs)
 
     return track.count, dirs
+
+
+def calc_states(old, new):
+    """
+    @brief      Calculates if files on one side have been updated, moved,
+                deleted, created or stayed the same.
+
+    @param      old   Flat of the past state of a directory
+    @param      old   Flat of the past state of a directory
+
+    @return     None.
+    """
+    new_before_deletes = tuple(new.names.keys())
+
+    for name, file in old.names.items():
+        if name not in new.names and (
+            file.uid not in new.uids or file.is_clone
+        ):
+            # Want all clone-moves to leave delete place holders.
+            new.update(name, file.uid, file.time, DELETED)
+
+    for name in new_before_deletes:
+        file = new.names[name]
+        if name in old.names:
+            if old.names[name].uid != file.uid:
+                if file.uid in old.uids and not file.is_clone:
+                    # degenatate double move
+                    file.moved = True
+                    file.state = THESAME
+                else:
+                    file.state = UPDATED
+            else:
+                file.state = THESAME
+        elif file.uid in old.uids and not file.is_clone:
+            file.moved = True
+            file.state = THESAME
+        else:
+            file.state = CREATED
 
 
 def match_states(lcl, rmt, recover):
