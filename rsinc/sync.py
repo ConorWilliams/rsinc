@@ -1,15 +1,12 @@
 from copy import deepcopy
 
-from .classes import SubPool
+from .classes import SubPool, THESAME, UPDATED, DELETED, CREATED
+from .classes import NOMOVE, MOVED, CLONE, NOTHERE
 from .rclone import safe_push, safe_move, move, resolve_case, track
 from .rclone import null, delL, delR, push, pull, conflict
 from .colors import red
 
 NUMBER_OF_WORKERS = 7
-
-THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
-NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4, 8))
-
 # Encodes logic for match states function.
 LOGIC = [
     [null, pull, delL, conflict],

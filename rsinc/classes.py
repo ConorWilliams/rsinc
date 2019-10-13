@@ -5,7 +5,8 @@ import os
 
 from time import sleep
 
-THESAME = 0  # Must match THESAME in sync.py
+THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
+NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4, 8))
 
 
 class SubPool:

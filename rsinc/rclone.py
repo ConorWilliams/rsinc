@@ -8,7 +8,7 @@ import os
 from rfc3339 import strtotimestamp
 from tqdm import tqdm
 
-from .classes import Flat, Struct
+from .classes import Flat, Struct, CREATED
 from .colors import red, mgt, cyn, ylw
 
 log = logging.getLogger(__name__)
@@ -284,6 +284,13 @@ def conflict(name_s, name_d, flat_s, flat_d):
     @return     None.
     """
     global track
+
+    if (
+        flat_s.names[name_s].state == CREATED
+        and flat_d.names[name_d].state == CREATED
+        and flat_s.names[name_s].uid == flat_d.names[name_d].uid
+    ):
+        return
 
     print(
         red("Conflict: ")
