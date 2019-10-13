@@ -9,76 +9,7 @@ THESAME, UPDATED, DELETED, CREATED = tuple(range(4))
 NOMOVE, MOVED, CLONE, NOTHERE = tuple(range(4, 8))
 
 
-class SubPool:
-    """
-    @brief      Class to coordinate a pool of worker subprocess Processes
-    """
-
-    def __init__(self, max_workers):
-        self.procs = []
-        self.max_workers = max_workers
-
-    def run(self, cmd):
-        """
-        @brief      Launch a subprocess to run a command.
-
-        @param      self  The object
-        @param      cmd   The command to run
-
-        @return     None.
-        """
-        if len(self.procs) < self.max_workers:
-            self.procs.append(subprocess.Popen(cmd))
-            return
-        else:
-            done = None
-            while done is None:
-                done = self._find_done_process()
-
-            self.procs.pop(done).terminate()
-            self.run(cmd)
-
-    def _find_done_process(self):
-        """
-        @brief      Finds a completed Process.
-
-        @param      self  The object
-
-        @return     Index of the completed Process.
-        """
-        for c, proc in enumerate(self.procs):
-            poll = proc.poll()
-            if poll == 0:
-                return c
-            elif poll is None:
-                sleep(0.01)
-                continue
-            else:
-                print("Error polled:", poll, "with", proc.args)
-                return c
-
-        return None
-
-    def wait(self):
-        """
-        @brief      Waits for all worker Processes to complete.
-
-        @param      self  The object
-
-        @return     None.
-        """
-        for proc in self.procs:
-            proc.wait()
-            proc.terminate()
-
-        self.procs = []
-
-
 class File:
-    """
-    @brief      Class for to represent a file.
-    """
-
     def __init__(self, name, uid, time, state, moved, is_clone, synced, ignore):
         self.name = name
         self.uid = uid
@@ -91,13 +22,6 @@ class File:
         self.ignore = ignore
 
     def dump(self):
-        """
-        @brief      Get all properties accept name.
-
-        @param      self  The object
-
-        @return     All file properties accept name.
-        """
         return (
             self.uid,
             self.time,
@@ -128,7 +52,6 @@ class Flat:
         synced=False,
         ignore=False,
     ):
-
         self.names.update(
             {
                 name: File(
@@ -161,13 +84,10 @@ class Flat:
         self.lower.remove(name.lower())
 
     def tag_ignore(self, regexs):
-        # print(regexs)
         for name, file in self.names.items():
             if any(r.match(os.path.join(self.path, name)) for r in regexs):
-                # print("ignore", os.path.join(self.path, name))
                 file.ignore = True
             else:
-                # print("NOT ignore", os.path.join(self.path, name))
                 file.ignore = False
 
     def rm_ignore(self):
@@ -186,3 +106,45 @@ class Struct:
         self.case = True
         self.pool = None
         self.rclone_flags = []
+
+
+class SubPool:
+    def __init__(self, max_workers):
+        self.procs = []
+        self.max_workers = max_workers
+
+    def run(self, cmd):
+
+        if len(self.procs) < self.max_workers:
+            self.procs.append(subprocess.Popen(cmd))
+            return
+        else:
+            done = None
+            while done is None:
+                done = self._find_done_process()
+
+            self.procs.pop(done).terminate()
+            self.run(cmd)
+
+    def _find_done_process(self):
+
+        for c, proc in enumerate(self.procs):
+            poll = proc.poll()
+            if poll == 0:
+                return c
+            elif poll is None:
+                sleep(0.01)
+                continue
+            else:
+                print("Error polled:", poll, "with", proc.args)
+                return c
+
+        return None
+
+    def wait(self):
+
+        for proc in self.procs:
+            proc.wait()
+            proc.terminate()
+
+        self.procs = []

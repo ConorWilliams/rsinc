@@ -26,20 +26,6 @@ def sync(
     case=True,
     flags=[],
 ):
-    """
-    @brief      Main sync function runs appropriate sync depending on arguments.
-
-    @param      lcl      Flat of the lcl directory
-    @param      rmt      Flat of the rmt directory
-    @param      old      Flat of the past state of lcl and rmt
-    @param      recover  Flag to run recovery sync
-    @param      dry_run  Flag to do a dry run
-    @param      total    The total number of operations the sync will require
-    @param      case     Flag to enable case insensitive checking
-
-    @return     The total number of jobs required, list of all (absolute)
-                directories not in lcl or remote.
-    """
     global track
 
     track.lcl = lcl.path

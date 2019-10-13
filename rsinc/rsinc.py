@@ -8,7 +8,7 @@ import glob
 import re
 from datetime import datetime
 
-import ujson as json
+import ujson
 import halo
 from pyfiglet import Figlet
 
@@ -37,7 +37,7 @@ def qt(string):
 def read(file):
     """Reads json do dict and returns dict."""
     with open(file, "r") as fp:
-        d = json.load(fp)
+        d = ujson.load(fp)
 
     return d
 
@@ -45,7 +45,7 @@ def read(file):
 def write(file, d):
     """Writes dict to json"""
     with open(file, "w") as fp:
-        json.dump(d, fp, sort_keys=True, indent=2)
+        ujson.dump(d, fp, sort_keys=True, indent=2)
 
 
 def strtobool(string):

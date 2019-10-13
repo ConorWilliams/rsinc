@@ -2,12 +2,12 @@
 
 
 def empty():
-    """Returns dict representing empty directory."""
+    # Returns dict representing empty directory.
     return {"fold": {}, "file": {}}
 
 
 def insert(nest, chain):
-    """Inserts element at the end of the chain into packed dict, nest."""
+    # Inserts element at the end of the chain into packed dict, nest.
     if len(chain) == 2:
         nest["file"].update({chain[0]: chain[1]})
         return
@@ -19,7 +19,7 @@ def insert(nest, chain):
 
 
 def pack(flat):
-    """Converts flat, into packed dict."""
+    # Converts flat, into packed dict.
     nest = empty()
     for name, file in flat.names.items():
         chain = name.split("/") + [file.uid]
@@ -29,7 +29,7 @@ def pack(flat):
 
 
 def unpack(nest, flat, path=""):
-    """Converts packed dict, nest, into flat."""
+    # Converts packed dict, nest, into flat.
     for k, v in nest["file"].items():
         flat.update(path + k, v)
 
@@ -38,7 +38,7 @@ def unpack(nest, flat, path=""):
 
 
 def _get_branch(nest, chain):
-    """Returns packed dict at end of chain in packed dict, nest."""
+    # Returns packed dict at end of chain in packed dict, nest.
     if len(chain) == 0:
         return nest
     else:
@@ -46,12 +46,12 @@ def _get_branch(nest, chain):
 
 
 def get_branch(nest, path):
-    """Helper function for _get_branch, converts path to chain."""
+    # Helper function for _get_branch, converts path to chain.
     return _get_branch(nest, path.split("/"))
 
 
 def _merge(nest, chain, new):
-    """Merge packed dict, new, into packed dict, nest, at end of chain."""
+    # Merge packed dict, new, into packed dict, nest, at end of chain.
     if len(chain) == 1:
         nest["fold"].update({chain[0]: new})
         return
@@ -63,5 +63,5 @@ def _merge(nest, chain, new):
 
 
 def merge(nest, path, new):
-    """Helper function for _merge, converts path to chain."""
+    # Helper function for _merge, converts path to chain.
     _merge(nest, path.split("/"), new)

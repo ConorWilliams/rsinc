@@ -1,8 +1,9 @@
 # Provides interactive command line configure
 
 import os
-import ujson as json
 import subprocess
+
+import ujson
 
 from .colors import grn, red, ylw
 
@@ -21,8 +22,8 @@ def get_hashes(path):
     r1 = subprocess.Popen(c1, stdout=subprocess.PIPE)
     r2 = subprocess.Popen(c2, stdout=subprocess.PIPE)
 
-    files = json.load(r1.stdout)
-    dirs = json.load(r2.stdout)
+    files = ujson.load(r1.stdout)
+    dirs = ujson.load(r2.stdout)
 
     if len(files) == 0:
         for d in dirs:
@@ -88,4 +89,4 @@ def config_cli(config_path):
 
     with open(config_path, "w") as file:
         print("Writing config to:", config_path)
-        json.dump(defult_config, file, sort_keys=True, indent=4)
+        ujson.dump(defult_config, file, sort_keys=True, indent=4)

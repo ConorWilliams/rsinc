@@ -1,10 +1,10 @@
 # Provides interface to rclone commands
 
 import subprocess
-import ujson as json
 import logging
 import os
 
+import ujson
 from rfc3339 import strtotimestamp
 from tqdm import tqdm
 
@@ -92,7 +92,7 @@ def lsl(path, hash_name):
     result = subprocess.Popen(
         command + track.rclone_flags, stdout=subprocess.PIPE
     )
-    list_of_dicts = json.load(result.stdout)
+    list_of_dicts = ujson.load(result.stdout)
 
     command = ["rclone", "hashsum", hash_name, path]
     result = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -324,7 +324,6 @@ def delL(name_s, name_d, flat_s, flat_d):
     @param      flat_s  The Flat in containing the file to delete
     @param      flat_d  Dummy argument
 
-    @return     { description_of_the_return_value }
     """
     global track
     track.count += 1
