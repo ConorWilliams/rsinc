@@ -17,8 +17,17 @@ from .rclone import make_dirs, lsl
 from .packed import pack, merge, unpack, get_branch, empty
 from .classes import Flat
 from .colors import grn, ylw, red
+from .config import config_cli
 
 from .__init__ import __version__
+
+spin = halo.Halo(spinner='dots', placement='right', color='yellow')
+CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
+
+custom_fig = Figlet(font='graffiti')
+print(custom_fig.renderText('Rsinc'))
+print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
+print('This is free software with ABSOLUTELY NO WARRANTY')
 
 # ****************************************************************************
 # *                                 Functions                                *
@@ -150,8 +159,11 @@ parser.add_argument("-v",
                     "--version",
                     action='version',
                     version=f'rsinc version: {__version__}')
-parser.add_argument("--config",
+parser.add_argument("--config_path",
                     help="Path to config file (default ~/.rsinc/config.json)")
+parser.add_argument("--config",
+                    action="store_true",
+                    help="Enter interactive CLI configurer")
 parser.add_argument("args",
                     nargs=argparse.REMAINDER,
                     help='Global flags to pass to rclone commands')
@@ -161,19 +173,20 @@ args = parser.parse_args()
 dry_run = args.dry
 auto = args.auto
 
-spin = halo.Halo(spinner='dots', placement='right', color='yellow')
-
 # ****************************************************************************
 # *                              Configuration                               *
 # ****************************************************************************
 
-CONFIG_FILE = os.path.expanduser('~/.rsinc/config.json')  # Default config path
-
 # Read config and assign variables.
-if args.config is None:
-    config = read(CONFIG_FILE)
+if args.config_path is None:
+    config_path = CONFIG_FILE
 else:
-    config = read(args.config)
+    config_path = args.config_path
+
+if not os.path.isfile(config_path) or args.config:
+    config_cli(config_path)
+
+config = read(config_path)
 
 CASE_INSENSATIVE = config['CASE_INSENSATIVE']
 DEFAULT_DIRS = config['DEFAULT_DIRS']
@@ -201,10 +214,6 @@ def main():
     '''
     Entry point for 'rsinc' as terminal command.
     '''
-    custom_fig = Figlet(font='graffiti')
-    print(custom_fig.renderText('Rsinc'))
-    print('Copyright 2019 C. J. Williams (CHURCHILL COLLEGE)')
-    print('This is free software with ABSOLUTELY NO WARRANTY')
 
     recover = args.recovery
 
