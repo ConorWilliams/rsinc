@@ -40,23 +40,22 @@ def config_cli(config_path):
     DRIVE_DIR = os.path.split(config_path)[0]  # Where config lives
 
     BASE_L = os.path.expanduser(input('Path to local root folder i.e "~/": '))
-    if BASE_L[-1] != "/" and BASE_L[-1] != ":":
-        BASE_L += "/"
-        print('Missing trailing "/" or ":" corrected to:', BASE_L)
-
+    BASE_L = os.path.normpath(BASE_L)
     print("Local root is:", grn(BASE_L))
     print()
 
     BASE_R = os.path.expanduser(
         input('Path to remote root folder i.e "onedrive:": ')
     )
-    if BASE_R[-1] != "/" and BASE_R[-1] != ":":
+    BASE_R = os.path.normpath(BASE_R)
+    if BASE_R[-1] != ":":
         BASE_R += ":"
-        print('Missing trailing "/" or ":" corrected to:', BASE_R)
+        print('Missing trailing ":" corrected to:', BASE_R)
 
     print("Remote root is:", grn(BASE_R))
     print()
 
+    print("Finding a matching hash function...")
     lcl_hashes = get_hashes(BASE_L)
     rmt_hashes = get_hashes(BASE_R)
     common = lcl_hashes.intersection(rmt_hashes)

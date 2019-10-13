@@ -214,7 +214,12 @@ def move(name_s, name_d, flat):
         print("%d/%d" % (track.count, track.total), info)
         log.info("%s(%s) %s TO %s", text.upper(), base, name_s, name_d)
         track.pool.run(
-            ["rclone", "moveto", base + name_s, base + name_d]
+            [
+                "rclone",
+                "moveto",
+                os.path.join(base, name_s),
+                os.path.join(base, name_d),
+            ]
             + track.rclone_flags
         )
     else:
@@ -253,7 +258,12 @@ def push(name_s, name_d, flat_s, flat_d):
     if not track.dry:
         print("%d/%d" % (track.count, track.total), info)
         log.info("%s%s", text.upper(), name_d)
-        cmd = ["rclone", "copyto", flat_s.path + name_s, flat_d.path + name_d]
+        cmd = [
+            "rclone",
+            "copyto",
+            os.path.join(flat_s.path, name_s),
+            os.path.join(flat_d.path, name_d),
+        ]
         track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)
@@ -317,8 +327,8 @@ def delL(name_s, name_d, flat_s, flat_d):
 
     if not track.dry:
         print("%d/%d" % (track.count, track.total), info)
-        log.info("DELETE:   %s", flat_s.path + name_s)
-        cmd = ["rclone", "delete", flat_s.path + name_s]
+        log.info("DELETE:   %s", os.path.join(flat_s.path, name_s))
+        cmd = ["rclone", "delete", os.path.join(flat_s.path, name_s)]
         track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)

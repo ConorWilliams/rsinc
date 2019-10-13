@@ -236,12 +236,13 @@ def main():
         elif not os.path.isdir(f):
             if strtobool(
                 input(
-                    ylw("WARN: ") + f"{f} does not exist in local sync anyway? "
+                    ylw("WARN: ")
+                    + f"{f} does not exist in local, sync anyway? "
                 )
             ):
-                folders.append(f[len(BASE_L) :])
+                folders.append(os.path.relpath(f, BASE_L))
         else:
-            folders.append(f[len(BASE_L) :])
+            folders.append(os.path.relpath(f, BASE_L))
 
     # Get & read master.
     if args.purge or not os.path.exists(MASTER):
@@ -271,8 +272,10 @@ def main():
     # Main loop.
     for folder in folders:
         print("")
-        path_lcl = BASE_L + folder + "/"
-        path_rmt = BASE_R + folder + "/"
+        path_lcl = os.path.join(BASE_L, folder)
+        path_rmt = os.path.join(BASE_R, folder)
+
+        print(path_lcl, path_rmt)
 
         # Determine if first run.
         if os.path.join(BASE_L, folder) in history:
@@ -346,7 +349,7 @@ def main():
                     print("Skipping crawl as no jobs")
                     now = lcl
                 else:
-                    now = lsl(BASE_L + folder, HASH_NAME, regexs)
+                    now = lsl(path_lcl, HASH_NAME, regexs)
 
                 # Merge into history.
                 history.add(os.path.join(BASE_L, folder))
