@@ -272,8 +272,6 @@ def main():
         path_lcl = os.path.join(BASE_L, folder)
         path_rmt = os.path.join(BASE_R, folder)
 
-        print(path_lcl, path_rmt)
-
         # Determine if first run.
         if os.path.join(BASE_L, folder) in history:
             print(grn("Have:"), qt(folder) + ", entering sync & merge mode")
