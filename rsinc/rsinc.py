@@ -99,13 +99,13 @@ def build_regexs(path, files):
     plain = []
 
     for file in files:
-        for f_char, p_char in zip(os.path.split(file)[0], path):
+        for f_char, p_char in zip(os.path.dirname(file), path):
             if f_char != p_char:
                 break
         else:
             if os.path.exists(file):
                 base = []
-                for char in os.path.split(file)[0][len(path) :]:
+                for char in os.path.dirname(file)[len(path) + 1 :]:
                     base.append(ESCAPE.get(char, char))
                 base = "".join(base)
 

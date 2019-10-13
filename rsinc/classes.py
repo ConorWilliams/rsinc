@@ -148,7 +148,7 @@ class Flat:
         )
         self.lower.add(name.lower())
 
-        d = os.path.split(name)[0]
+        d = os.path.dirname(name)
         d = os.path.join(self.path, d)
         self.dirs.add(d)
 

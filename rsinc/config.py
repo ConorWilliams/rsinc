@@ -39,7 +39,7 @@ def config_cli(config_path):
     print()
     print("Starting", ylw("configuration"), "mode")
 
-    DRIVE_DIR = os.path.split(config_path)[0]  # Where config lives
+    DRIVE_DIR = os.path.dirname(config_path)  # Where config lives
 
     BASE_L = os.path.expanduser(input('Path to local root folder i.e "~/": '))
     BASE_L = os.path.normpath(BASE_L)

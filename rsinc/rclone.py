@@ -202,7 +202,7 @@ def move(name_s, name_d, flat):
     elif base == track.rmt:
         col = mgt
 
-    if os.path.split(name_s)[0] == os.path.split(name_d)[0]:
+    if os.path.dirname(name_s) == os.path.dirname(name_d):
         text = "Rename:"
     else:
         text = "Move:"
