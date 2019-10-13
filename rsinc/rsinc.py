@@ -131,6 +131,7 @@ TEMP_FILE = config["TEMP_FILE"]
 MASTER = config["MASTER"]
 BASE_R = config["BASE_R"]
 BASE_L = config["BASE_L"]
+FAST_SAVE = config["FAST_SAVE"]
 
 # Set up logging.
 logging.basicConfig(
@@ -286,6 +287,8 @@ def main():
                 # Get post sync state
                 if total == 0:
                     print("Skipping crawl as no jobs")
+                    now = lcl
+                elif FAST_SAVE:
                     now = lcl
                 else:
                     now = lsl(path_lcl, HASH_NAME)

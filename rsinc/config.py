@@ -85,6 +85,7 @@ def config_cli(config_path):
         "LOG_FOLDER": os.path.join(DRIVE_DIR, "logs/"),
         "MASTER": os.path.join(DRIVE_DIR, "master.json"),
         "TEMP_FILE": os.path.join(DRIVE_DIR, "rsinc.tmp"),
+        "FAST_SAVE": False,
     }
 
     with open(config_path, "w") as file:
