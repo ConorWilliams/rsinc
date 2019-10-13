@@ -23,7 +23,7 @@ Rsinc is a two-way cloud synchronisation client for **Linux**. Rsinc utilises [r
 
 Install [rclone](https://github.com/ncw/rclone) and [configure](https://rclone.org/docs/) as appropriate for your cloud service.
 
-Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc@stable`
+Install rsinc with: `pip3 install git+https://github.com/ConorWilliams/rsinc`
 
 Rsinc will create a `~/.rsinc/` directory and configure it with the defaults.
 

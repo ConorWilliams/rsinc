@@ -1,4 +1,4 @@
-# Provides functions for manipulating packked dictionarys
+# Provides functions for manipulating packed dictionarys
 
 
 def empty():

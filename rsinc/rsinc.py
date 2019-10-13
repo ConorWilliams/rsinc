@@ -1,4 +1,4 @@
-# main entry point for rsinc
+# rsinc : two-way / bi-drectional sync for rclone
 
 import argparse
 import os

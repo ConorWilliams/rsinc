@@ -1,3 +1,5 @@
+# Provides interactive command line configure
+
 import os
 import ujson as json
 import subprocess
@@ -10,7 +12,7 @@ hashes = ["MD5", "SHA-1", "DropboxHash", "QuickXorHash", "Whirlpool", "CRC-32"]
 
 
 def get_hashes(path):
-    # recursivly search for a file to hash in path
+    # Recursivly search for a file to hash in path
     print("Searching:", path)
 
     c1 = ["rclone", "lsjson", "--files-only", "--hash", "--copy-links", path]
