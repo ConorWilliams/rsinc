@@ -78,7 +78,7 @@ class File:
     @brief      Class for to represent a file.
     """
 
-    def __init__(self, name, uid, time, state, moved, is_clone, synced):
+    def __init__(self, name, uid, time, state, moved, is_clone, synced, ignore):
         self.name = name
         self.uid = uid
         self.time = time
@@ -87,6 +87,7 @@ class File:
         self.moved = moved
         self.is_clone = is_clone
         self.synced = synced
+        self.ignore = ignore
 
     def dump(self):
         """
@@ -103,14 +104,11 @@ class File:
             self.moved,
             self.is_clone,
             self.synced,
+            self.ignore,
         )
 
 
 class Flat:
-    """
-    @brief      Class to represent a directory of files.
-    """
-
     def __init__(self, path):
         self.path = path
         self.names = {}
@@ -127,24 +125,15 @@ class Flat:
         moved=False,
         is_clone=False,
         synced=False,
+        ignore=False,
     ):
-        """
-        @brief      Add a File to the Flat with specified properties.
-
-        @param      self      The object
-        @param      name      The name of the file
-        @param      uid       The uid of the file
-        @param      time      The modtime of the file
-        @param      state     The state of the file
-        @param      moved     Indicates file is moved
-        @param      is_clone  Indicates file is clone
-        @param      synced    Indicates file is synced
-
-        @return     None.
-        """
 
         self.names.update(
-            {name: File(name, uid, time, state, moved, is_clone, synced)}
+            {
+                name: File(
+                    name, uid, time, state, moved, is_clone, synced, ignore
+                )
+            }
         )
         self.lower.add(name.lower())
 
@@ -160,30 +149,30 @@ class Flat:
             self.uids.update({uid: self.names[name]})
 
     def clean(self):
-        """
-        @brief      Flags all files as unsynced.
-
-        @param      self  The object
-
-        @return     None.
-        """
         for file in self.names.values():
             file.synced = False
 
     def rm(self, name):
-        """
-        @brief      Removes file from the Flat.
-
-        @param      self  The object
-        @param      name  The name of the file to delete
-
-        @return     None.
-        """
         if not self.names[name].is_clone:
             del self.uids[self.names[name].uid]
 
         del self.names[name]
         self.lower.remove(name.lower())
+
+    def tag_ignore(self, regexs):
+        # print(regexs)
+        for name, file in self.names.items():
+            if any(r.match(os.path.join(self.path, name)) for r in regexs):
+                # print("ignore", os.path.join(self.path, name))
+                file.ignore = True
+            else:
+                # print("NOT ignore", os.path.join(self.path, name))
+                file.ignore = False
+
+    def rm_ignore(self):
+        for name, file in tuple(self.names.items()):
+            if file.ignore:
+                self.rm(name)
 
 
 class Struct:

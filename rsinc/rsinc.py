@@ -81,11 +81,25 @@ ESCAPE = {
     "$": "\\$",
     "*": "\\*",
     "+": "\\+",
+    "?": "\\?",
     "|": "\\|",
+    "(": "\\(",
+    ")": "\\)",
+    "{": "\\{",
+    "}": "\\}",
+    "[": "\\[",
+    "]": "\\]",
 }
 
 
-def build_regexs(path, files):
+def escape(string):
+    tmp = []
+    for char in string:
+        tmp.append(ESCAPE.get(char, char))
+    return "".join(tmp)
+
+
+def build_regexs(BASE_L, BASE_R, path_lcl, files):
     """
     @brief      Compiles relative regexs.
 
@@ -95,27 +109,30 @@ def build_regexs(path, files):
     @return     List of compiled relative reqexes and list of plain text
                 relative regexes.
     """
-    regex = []
+    lcl_regex = []
+    rmt_regex = []
     plain = []
 
     for file in files:
-        for f_char, p_char in zip(os.path.dirname(file), path):
+        for f_char, p_char in zip(os.path.dirname(file), path_lcl):
             if f_char != p_char:
                 break
         else:
             if os.path.exists(file):
-                base = []
-                for char in os.path.dirname(file)[len(path) + 1 :]:
-                    base.append(ESCAPE.get(char, char))
-                base = "".join(base)
-
                 with open(file, "r") as fp:
                     for line in fp:
-                        r = os.path.join(base, line.rstrip())
-                        plain.append(r)
-                        regex.append(re.compile(r))
+                        mid = os.path.dirname(file)
+                        mid = mid[len(BASE_L) + 1 :]
+                        mid = os.path.join(escape(mid), line.rstrip())
 
-    return regex, plain
+                        lcl = os.path.join(escape(BASE_L), mid)
+                        rmt = os.path.join(escape(BASE_R), mid)
+
+                        plain.append(mid)
+                        lcl_regex.append(re.compile(lcl))
+                        rmt_regex.append(re.compile(rmt))
+
+    return rmt_regex, lcl_regex, plain
 
 
 # ****************************************************************************
@@ -207,9 +224,7 @@ logging.basicConfig(
 
 
 def main():
-    """
-    Entry point for 'rsinc' as terminal command.
-    """
+    # Entry point for 'rsinc' as terminal command.
 
     recover = args.recovery
 
@@ -280,17 +295,22 @@ def main():
             recover = True
 
         # Build relative regular expressions
-        regexs, plain = build_regexs(path_lcl, ignores)
+        rmt_regexs, lcl_regexs, plain = build_regexs(
+            BASE_L, BASE_R, path_lcl, ignores
+        )
         print("Ignore:", plain)
 
         # Scan directories.
         spin.start(("Crawling: ") + qt(folder))
 
-        lcl = lsl(path_lcl, HASH_NAME, regexs)
-        rmt = lsl(path_rmt, HASH_NAME, regexs)
-        old = Flat("old")
+        lcl = lsl(path_lcl, HASH_NAME)
+        rmt = lsl(path_rmt, HASH_NAME)
+        old = Flat(path_lcl)
 
         spin.stop_and_persist(symbol="✔")
+
+        lcl.tag_ignore(lcl_regexs)
+        rmt.tag_ignore(rmt_regexs)
 
         # First run & recover mode.
         if recover:
@@ -344,7 +364,10 @@ def main():
                     print("Skipping crawl as no jobs")
                     now = lcl
                 else:
-                    now = lsl(path_lcl, HASH_NAME, regexs)
+                    now = lsl(path_lcl, HASH_NAME)
+                    now.tag_ignore(lcl_regexs)
+
+                now.rm_ignore()
 
                 # Merge into history.
                 history.add(os.path.join(BASE_L, folder))

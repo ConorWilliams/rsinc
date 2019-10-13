@@ -73,7 +73,7 @@ def resolve_case(name, flat):
     return new_name
 
 
-def lsl(path, hash_name, regexs=[]):
+def lsl(path, hash_name):
     """
     @brief      Runs rclone lsjson and builds a Flat.
 
@@ -105,18 +105,17 @@ def lsl(path, hash_name, regexs=[]):
 
     out = Flat(path)
     for d in list_of_dicts:
-        if not any(r.match(d["Path"]) for r in regexs):
-            time = strtotimestamp(d["ModTime"])
-            hashsize = str(d["Size"])
+        time = strtotimestamp(d["ModTime"])
+        hashsize = str(d["Size"])
 
-            hash = hashes.get(d["Path"], None)
-            if hash is not None:
-                hashsize += hash
-            else:
-                print(red("ERROR:"), "can't find", d["Path"], "hash")
-                continue
+        hash = hashes.get(d["Path"], None)
+        if hash is not None:
+            hashsize += hash
+        else:
+            print(red("ERROR:"), "can't find", d["Path"], "hash")
+            continue
 
-            out.update(d["Path"], hashsize, time)
+        out.update(d["Path"], hashsize, time)
 
     return out
 

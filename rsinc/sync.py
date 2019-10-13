@@ -133,7 +133,7 @@ def match_states(lcl, rmt, recover):
     for name in names:
         file = lcl.names[name]
 
-        if file.synced:
+        if file.synced or file.ignore:
             continue
 
         file.synced = True
@@ -174,7 +174,7 @@ def match_moves(old, lcl, rmt):
         else:
             file = lcl.names[name]
 
-        if file.synced or not file.moved:
+        if file.synced or not file.moved or file.ignore:
             continue
 
         file.synced = True
