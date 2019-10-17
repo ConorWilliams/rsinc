@@ -143,10 +143,10 @@ def safe_push(name, flat_s, flat_d):
         new, old = resolve_case(new, pair[c]), new
         c = 0 if c == 1 else 1
 
-    push(name, new, flat_s, flat_d)
-
     cpd_dump = flat_s.names[name].dump()
     flat_d.update(new, *cpd_dump)
+
+    push(name, new, flat_s, flat_d)
 
     if new != name:
         # Must wait for copy to finish before renaming source.
@@ -266,6 +266,9 @@ def push(name_s, name_d, flat_s, flat_d):
         track.pool.run(cmd + track.rclone_flags)
     else:
         print(info)
+
+    # Needed for fast save
+    flat_d.names[name_d].uid = flat_s.names[name_s].uid
 
 
 def pull(name_s, name_d, flat_s, flat_d):

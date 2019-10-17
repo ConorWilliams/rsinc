@@ -58,7 +58,7 @@ def sync(
 
     dirs = (cp_lcl.dirs - lcl.dirs) | (cp_rmt.dirs - rmt.dirs)
 
-    return track.count, dirs
+    return track.count, dirs, cp_lcl, cp_rmt
 
 
 def calc_states(old, new):

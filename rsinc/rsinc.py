@@ -4,7 +4,6 @@ import argparse
 import os
 import subprocess
 import logging
-import glob
 import re
 from datetime import datetime
 
@@ -191,8 +190,13 @@ def main():
 
     # Find all the ignore files in lcl and save them.
     if args.ignore:
-        search = os.path.normpath(BASE_L + "/**/.rignore")
-        ignores = glob.glob(search, recursive=True)
+        ignores = []
+        for dirpath, dirnames, filenames in os.walk(BASE_L, followlinks=False):
+            for name in filenames:
+                if name == '.rignore':
+                    ignores.append(os.path.join(dirpath, name))
+
+        print("Found:", ignores)
         write(MASTER, (history, ignores, nest))
 
     # Detect crashes.
@@ -249,7 +253,7 @@ def main():
             calc_states(old, rmt)
 
         print(grn("Dry pass:"))
-        total, new_dirs = sync(
+        total, new_dirs, _, _ = sync(
             lcl,
             rmt,
             old,
@@ -271,7 +275,7 @@ def main():
                 write(TEMP_FILE, {"folder": folder})
 
                 make_dirs(new_dirs)
-                sync(
+                _, _, lcl, rmt, = sync(
                     lcl,
                     rmt,
                     old,
@@ -289,6 +293,7 @@ def main():
                     print("Skipping crawl as no jobs")
                     now = lcl
                 elif FAST_SAVE:
+                    print("Skipping crawl as FAST_SAVE")
                     now = lcl
                 else:
                     now = lsl(path_lcl, HASH_NAME)
@@ -333,8 +338,10 @@ def build_regexs(BASE_L, BASE_R, path_lcl, files):
             if os.path.exists(file):
                 with open(file, "r") as fp:
                     for line in fp:
+                        if line.rstrip() == "":
+                            continue
                         mid = os.path.dirname(file)
-                        mid = mid[len(BASE_L) + 1 :]
+                        mid = mid[len(BASE_L) + 1:]
                         mid = os.path.join(escape(mid), line.rstrip())
 
                         lcl = os.path.join(escape(BASE_L), mid)
