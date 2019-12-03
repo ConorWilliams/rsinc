@@ -51,7 +51,7 @@ def config_cli(config_path):
         input('Path to remote root folder i.e "onedrive:": ')
     )
     BASE_R = os.path.normpath(BASE_R)
-    if BASE_R[-1] != ":":
+    if ":" not in BASE_R:
         BASE_R += ":"
         print('Missing trailing ":" corrected to:', BASE_R)
 
