@@ -33,7 +33,13 @@ def get_hashes(path):
 
         return None
     else:
-        return set(files[0]["Hashes"].keys())
+        if "Hashes" in files[0]:
+            return set(files[0]["Hashes"].keys())
+        else:
+            print(
+                "Something seems to have gone wrong, please raise an issue on github and include this traceback"
+            )
+            print(files)
 
 
 def config_cli(config_path):
@@ -58,9 +64,12 @@ def config_cli(config_path):
     print("Remote root is:", grn(BASE_R))
     print()
 
-    print("Finding a matching hash function...")
+    print("Finding a hash functions in local...")
     lcl_hashes = get_hashes(BASE_L)
+
+    print("Finding a hash functions in remote...")
     rmt_hashes = get_hashes(BASE_R)
+
     common = lcl_hashes.intersection(rmt_hashes)
 
     if lcl_hashes is None or rmt_hashes is None or len(common) == 0:
