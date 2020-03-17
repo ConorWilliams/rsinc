@@ -80,7 +80,7 @@ The optional arguments available are:
 *  -a, --auto, automatically applies changes without requesting permission.
 *  -p, --purge, deletes the master file resulting in a **total reset** of all tracking.
 *  -i, --ignore, find `.rignore` files and add them to the ignore list. Flag must be set to find new `.rignore` files.
-*  --congig, launch the interactive configurer.
+*  --config, launch the interactive configurer.
 *  --config_path, enter path to a config file, defaults to `~/.rsinc/config.json`.
 
 Any remaining arguments/flags will be passed through to all rclone commands rsinc calls. Note a path must be supplied to rsinc when supplying additional flags instead of relying on the implicit current working directory (which can be explicitly called with `.`).
