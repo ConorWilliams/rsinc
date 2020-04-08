@@ -35,9 +35,16 @@ def qt(string):
 
 def read(file):
     """Reads json do dict and returns dict."""
-    with open(file, "r") as fp:
-        d = ujson.load(fp)
-
+    try:
+        with open(file, "r") as fp:
+            d = ujson.load(fp)
+            if not isinstance(d, dict):
+                raise ValueError("old file format")
+    except Exception as e:
+        emsg = "{} is corrupt ({}). ".format(file, e)
+        if file.endswith("master.json"):
+            emsg += "Delete it and restart rsinc to rebuild it."
+        raise TypeError(emsg)
     return d
 
 
@@ -183,9 +190,13 @@ def main():
     # Get & read master.
     if args.purge or not os.path.exists(MASTER):
         print(ylw("WARN:"), MASTER, "missing, this must be your first run")
-        write(MASTER, [[], [], empty()])
+        write(MASTER, {'history':[], 'ignores':[], 'nest':empty()})
 
-    history, ignores, nest = read(MASTER)
+    master = read(MASTER)
+    history = master['history']
+    ignores = master['ignores']
+    nest = master['nest']
+
     history = set(history)
 
     # Find all the ignore files in lcl and save them.
@@ -197,7 +208,7 @@ def main():
                     ignores.append(os.path.join(dirpath, name))
 
         print("Found:", ignores)
-        write(MASTER, (history, ignores, nest))
+        write(MASTER, {'history':list(history), 'ignores':ignores, 'nest':nest})
 
     # Detect crashes.
     if os.path.exists(TEMP_FILE):
@@ -307,7 +318,7 @@ def main():
 
                 # Merge into nest
                 merge(nest, folder, pack(now))
-                write(MASTER, (history, ignores, nest))
+                write(MASTER, {'history':list(history), 'ignores':ignores, 'nest':nest})
 
                 subprocess.run(["rm", TEMP_FILE])
 
