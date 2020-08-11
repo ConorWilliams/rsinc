@@ -32,7 +32,7 @@ setuptools.setup(
         "tonyg-rfc3339",
     ],
     entry_points={"console_scripts": ["rsinc=rsinc.rsinc:main"]},
-    python_requires=">=3",
+    python_requires=">=3.6",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "License :: OSI Approved :: MIT License",
